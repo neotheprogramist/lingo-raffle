@@ -29,6 +29,10 @@ contract Jackpot is Context, Ownable {
     mapping(bytes32 => Game) private games;
     mapping(bytes32 => bool) private gameExists;
 
+    event GameCreated(bytes32 indexed gameId, bytes32 randomnessCommitment);
+    event PlayerAmountIncreased(bytes32 indexed gameId, address indexed player, uint256 amount, uint256 nonce);
+    event WinnerDeclared(bytes32 indexed gameId, address winner);
+
     error GameAlreadyExists();
     error InvalidSignature();
     error CommitmentAlreadyOpened();
@@ -65,6 +69,7 @@ contract Jackpot is Context, Ownable {
         games[currentGameId].tree.initialize();
         games[currentGameId].randomnessCommitment = randomnessCommitment;
         games[currentGameId].currentRandomness = randomnessCommitment;
+        emit GameCreated(currentGameId, randomnessCommitment);
     }
 
     function increasePlayerAmount(
@@ -86,6 +91,7 @@ contract Jackpot is Context, Ownable {
         game.playerNonces[account]++;
         game.tree.insert(account, amount);
         game.currentRandomness = keccak256(abi.encode(game.currentRandomness, randomness));
+        emit PlayerAmountIncreased(gameId, account, amount, nonce);
     }
 
     function getPlayerAmount(address account) external view returns (uint256) {
@@ -110,7 +116,9 @@ contract Jackpot is Context, Ownable {
         uint256 currentRandomness = uint256(keccak256(abi.encode(game.currentRandomness, randomnessOpening)));
         uint256 max = game.tree.totalSum;
         uint256 boundedRandomness = bound(currentRandomness, 0, max);
-        return game.tree.getByPointOnInterval(boundedRandomness);
+        address winner = game.tree.getByPointOnInterval(boundedRandomness);
+        emit WinnerDeclared(gameId, winner);
+        return winner;
     }
 
     function bound(uint256 value, uint256 min, uint256 max) private pure returns (uint256) {
