@@ -56,6 +56,52 @@ contract JackpotTest is Test {
         assertEq(jackpot.getPlayerAmount(player1), 100);
     }
 
+    function testIncreasePlayerAmountZero() public {
+        // Setup a new game
+        bytes32 randomnessCommitment = keccak256(abi.encode("test"));
+        vm.prank(owner);
+        jackpot.newGame(randomnessCommitment);
+
+        // Prepare signed data with zero amount
+        Jackpot.IncreasePlayerAmountData memory data = Jackpot.IncreasePlayerAmountData({
+            account: player1,
+            amount: 0,
+            signature: Jackpot.Signature({r: bytes32(0), s: bytes32(0), v: 0})
+        });
+
+        bytes32 messageHash = keccak256(abi.encode(data.account, data.amount));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
+        data.signature = Jackpot.Signature({r: r, s: s, v: v});
+
+        // Increase player amount
+        jackpot.increasePlayerAmount(data, keccak256("randomness"));
+
+        // Add assertions to check if the player amount was increased correctly
+        assertEq(jackpot.getPlayerAmount(player1), 0);
+    }
+
+    function testIncreasePlayerAmountInvalidSignature() public {
+        // Setup a new game
+        bytes32 randomnessCommitment = keccak256(abi.encode("test"));
+        vm.prank(owner);
+        jackpot.newGame(randomnessCommitment);
+
+        // Prepare data with invalid owner signature
+        Jackpot.IncreasePlayerAmountData memory data = Jackpot.IncreasePlayerAmountData({
+            account: player1,
+            amount: 100,
+            signature: Jackpot.Signature({r: bytes32(0), s: bytes32(0), v: 0})
+        });
+
+        bytes32 messageHash = keccak256(abi.encode(data.account, data.amount));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(2, messageHash); // Using a different private key
+        data.signature = Jackpot.Signature({r: r, s: s, v: v});
+
+        // Attempt to increase player amount with invalid signature
+        vm.expectRevert(ECDSA.ECDSAInvalidSignature.selector);
+        jackpot.increasePlayerAmount(data, keccak256("randomness"));
+    }
+
     function testGetWinner() public {
         bytes memory randomness = abi.encode("test");
         // Setup a new game and add players
@@ -68,6 +114,25 @@ contract JackpotTest is Test {
         addPlayer(player2, 200);
 
         // Get winner
+        vm.prank(owner);
+        address winner = jackpot.getWinner(randomness);
+
+        // Add assertions to check if a winner was selected correctly
+        assertTrue(winner == player1 || winner == player2);
+    }
+
+    function testGetWinnerBoundaryValues() public {
+        bytes memory randomness = abi.encode("test");
+        // Setup a new game and add players
+        bytes32 randomnessCommitment = keccak256(randomness);
+        vm.prank(owner);
+        jackpot.newGame(randomnessCommitment);
+
+        // Add multiple players
+        addPlayer(player1, 100);
+        addPlayer(player2, 200);
+
+        // Get winner with boundary values
         vm.prank(owner);
         address winner = jackpot.getWinner(randomness);
 
