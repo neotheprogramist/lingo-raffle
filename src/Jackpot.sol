@@ -16,11 +16,14 @@ contract Jackpot is Context, Ownable {
         bytes32 randomnessCommitment;
         bytes32 currentRandomness;
         bool commitmentOpened;
+        mapping(address => uint256) playerNonces;
     }
 
     struct IncreasePlayerAmountData {
+        bytes32 gameId;
         address account;
         uint256 amount;
+        uint256 nonce;
         Signature signature;
     }
 
@@ -38,9 +41,11 @@ contract Jackpot is Context, Ownable {
     error InvalidSignature();
     error CommitmentAlreadyOpened();
     error InvalidRandomnessOpening();
+    error InvalidNonce();
+    error InvalidGameId();
 
     modifier onlySignedByOwner(IncreasePlayerAmountData calldata data) {
-        bytes32 hash = keccak256(abi.encode(data.account, data.amount));
+        bytes32 hash = keccak256(abi.encode(data.gameId, data.account, data.amount, data.nonce));
         if (ECDSA.recover(hash, data.signature.v, data.signature.r, data.signature.s) != owner()) {
             revert ECDSA.ECDSAInvalidSignature();
         }
@@ -82,8 +87,11 @@ contract Jackpot is Context, Ownable {
         external
         onlySignedByOwner(data)
     {
+        if (data.gameId != currentGameId) revert InvalidGameId();
         Game storage game = games[currentGameId];
         if (game.commitmentOpened) revert CommitmentAlreadyOpened();
+        if (data.nonce != game.playerNonces[data.account]) revert InvalidNonce();
+        game.playerNonces[data.account]++;
         game.tree.insert(data.account, data.amount);
         game.currentRandomness = keccak256(abi.encode(game.currentRandomness, randomness));
     }
@@ -95,8 +103,6 @@ contract Jackpot is Context, Ownable {
 
     function getWinner(bytes calldata randomnessOpening) external returns (address) {
         Game storage game = games[currentGameId];
-        console.log("randomnessOpening", uint256(keccak256(randomnessOpening)));
-        console.log("game.randomnessCommitment", uint256(game.randomnessCommitment));
         if (keccak256(randomnessOpening) != game.randomnessCommitment) {
             revert InvalidRandomnessOpening();
         }
