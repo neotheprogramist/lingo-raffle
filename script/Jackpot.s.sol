@@ -2,17 +2,17 @@
 pragma solidity ^0.8.13;
 
 import {Script, console} from "forge-std/Script.sol";
-import {Counter} from "../src/Counter.sol";
+import {Jackpot} from "../src/Jackpot.sol";
 
-contract CounterScript is Script {
-    Counter public counter;
+contract JackpotScript is Script {
+    Jackpot public jackpot;
 
     function setUp() public {}
 
     function run() public {
         vm.startBroadcast();
 
-        counter = new Counter();
+        jackpot = new Jackpot(msg.sender);
 
         vm.stopBroadcast();
     }
