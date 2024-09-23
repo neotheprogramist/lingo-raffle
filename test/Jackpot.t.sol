@@ -39,16 +39,11 @@ contract JackpotTest is Test {
         jackpot.newGame(randomnessCommitment);
 
         // Prepare signed data
-        Jackpot.IncreasePlayerAmountData memory data = Jackpot
-            .IncreasePlayerAmountData({
-                account: player1,
-                amount: 100,
-                signature: Jackpot.Signature({
-                    r: bytes32(0),
-                    s: bytes32(0),
-                    v: 0
-                })
-            });
+        Jackpot.IncreasePlayerAmountData memory data = Jackpot.IncreasePlayerAmountData({
+            account: player1,
+            amount: 100,
+            signature: Jackpot.Signature({r: bytes32(0), s: bytes32(0), v: 0})
+        });
 
         bytes32 messageHash = keccak256(abi.encode(data.account, data.amount));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
@@ -98,21 +93,14 @@ contract JackpotTest is Test {
         jackpot.newGame(randomnessCommitment);
 
         // Prepare data with invalid signature
-        Jackpot.IncreasePlayerAmountData memory data = Jackpot
-            .IncreasePlayerAmountData({
-                account: player1,
-                amount: 100,
-                signature: Jackpot.Signature({
-                    r: bytes32(0),
-                    s: bytes32(0),
-                    v: 0
-                })
-            });
+        Jackpot.IncreasePlayerAmountData memory data = Jackpot.IncreasePlayerAmountData({
+            account: player1,
+            amount: 100,
+            signature: Jackpot.Signature({r: bytes32(0), s: bytes32(0), v: 0})
+        });
 
         // Attempt to increase player amount with invalid signature
-        vm.expectRevert(
-            abi.encodeWithSelector(ECDSA.ECDSAInvalidSignature.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(ECDSA.ECDSAInvalidSignature.selector));
         jackpot.increasePlayerAmount(data, keccak256("randomness"));
     }
 
@@ -149,16 +137,11 @@ contract JackpotTest is Test {
 
     // Helper function to add a player with a signed message
     function addPlayer(address player, uint256 amount) internal {
-        Jackpot.IncreasePlayerAmountData memory data = Jackpot
-            .IncreasePlayerAmountData({
-                account: player,
-                amount: amount,
-                signature: Jackpot.Signature({
-                    r: bytes32(0),
-                    s: bytes32(0),
-                    v: 0
-                })
-            });
+        Jackpot.IncreasePlayerAmountData memory data = Jackpot.IncreasePlayerAmountData({
+            account: player,
+            amount: amount,
+            signature: Jackpot.Signature({r: bytes32(0), s: bytes32(0), v: 0})
+        });
 
         bytes32 messageHash = keccak256(abi.encode(data.account, data.amount));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);

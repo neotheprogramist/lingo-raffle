@@ -25,10 +25,7 @@ contract IntervalTreeTest is Test {
         assertEq(tree.get(account), value);
     }
 
-    function testFuzzGetByPointOnInterval(
-        address[30] memory accounts,
-        uint8[50] memory values
-    ) public {
+    function testFuzzGetByPointOnInterval(address[30] memory accounts, uint8[50] memory values) public {
         // Assume all accounts are non-zero
         for (uint256 i = 0; i < accounts.length; i++) {
             vm.assume(accounts[i] != address(0));
@@ -36,10 +33,7 @@ contract IntervalTreeTest is Test {
 
         uint256 sum = 0;
         for (uint256 i = 0; i < values.length; i++) {
-            address account = accounts[
-                uint256(keccak256(abi.encodePacked(values[i]))) %
-                    accounts.length
-            ];
+            address account = accounts[uint256(keccak256(abi.encodePacked(values[i]))) % accounts.length];
             cumulativeValues[account] += values[i];
             tree.insert(account, values[i]);
             sum += values[i];
@@ -55,20 +49,14 @@ contract IntervalTreeTest is Test {
         }
     }
 
-    function testFuzzClear(
-        address[30] memory accounts,
-        uint8[50] memory values
-    ) public {
+    function testFuzzClear(address[30] memory accounts, uint8[50] memory values) public {
         // Assume all accounts are non-zero
         for (uint256 i = 0; i < accounts.length; i++) {
             vm.assume(accounts[i] != address(0));
         }
 
         for (uint256 i = 0; i < values.length; i++) {
-            address account = accounts[
-                uint256(keccak256(abi.encodePacked(values[i]))) %
-                    accounts.length
-            ];
+            address account = accounts[uint256(keccak256(abi.encodePacked(values[i]))) % accounts.length];
             tree.insert(account, values[i]);
         }
 
@@ -80,10 +68,7 @@ contract IntervalTreeTest is Test {
         assertEq(tree.totalSum, 0);
     }
 
-    function testFuzzInsertExistingAccount(
-        address account,
-        uint8[50] memory values
-    ) public {
+    function testFuzzInsertExistingAccount(address account, uint8[50] memory values) public {
         vm.assume(account != address(0));
 
         uint256 sum = 0;

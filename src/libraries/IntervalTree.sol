@@ -22,11 +22,7 @@ library IntervalTree {
         self.totalSum = 0;
     }
 
-    function insert(
-        Tree storage self,
-        address account,
-        uint256 amount
-    ) internal {
+    function insert(Tree storage self, address account, uint256 amount) internal {
         address parent;
         address current = self.root;
 
@@ -60,10 +56,7 @@ library IntervalTree {
         self.totalSum += amount;
     }
 
-    function get(
-        Tree storage self,
-        address account
-    ) internal view returns (uint256) {
+    function get(Tree storage self, address account) internal view returns (uint256) {
         address current = self.root;
 
         while (current != address(0)) {
@@ -79,23 +72,16 @@ library IntervalTree {
         return 0; // Account not found
     }
 
-    function getByPointOnInterval(
-        Tree storage self,
-        uint256 value
-    ) internal view returns (address) {
+    function getByPointOnInterval(Tree storage self, uint256 value) internal view returns (address) {
         address current = self.root;
 
         while (current != address(0)) {
             if (value < self.nodes[current].leftSum) {
                 current = self.nodes[current].left;
-            } else if (
-                value < self.nodes[current].leftSum + self.nodes[current].value
-            ) {
+            } else if (value < self.nodes[current].leftSum + self.nodes[current].value) {
                 return current;
             } else {
-                value -=
-                    self.nodes[current].leftSum +
-                    self.nodes[current].value;
+                value -= self.nodes[current].leftSum + self.nodes[current].value;
                 current = self.nodes[current].right;
             }
         }

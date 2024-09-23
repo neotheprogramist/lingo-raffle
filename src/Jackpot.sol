@@ -41,14 +41,7 @@ contract Jackpot is Context, Ownable {
 
     modifier onlySignedByOwner(IncreasePlayerAmountData calldata data) {
         bytes32 hash = keccak256(abi.encode(data.account, data.amount));
-        if (
-            ECDSA.recover(
-                hash,
-                data.signature.v,
-                data.signature.r,
-                data.signature.s
-            ) != owner()
-        ) {
+        if (ECDSA.recover(hash, data.signature.v, data.signature.r, data.signature.s) != owner()) {
             revert ECDSA.ECDSAInvalidSignature();
         }
         _;
@@ -60,15 +53,11 @@ contract Jackpot is Context, Ownable {
         return currentGameId;
     }
 
-    function getGameRandomnessCommitment(
-        bytes32 key
-    ) external view returns (bytes32) {
+    function getGameRandomnessCommitment(bytes32 key) external view returns (bytes32) {
         return games[key].randomnessCommitment;
     }
 
-    function getGameCurrentRandomness(
-        bytes32 key
-    ) external view returns (bytes32) {
+    function getGameCurrentRandomness(bytes32 key) external view returns (bytes32) {
         return games[key].currentRandomness;
     }
 
@@ -89,16 +78,14 @@ contract Jackpot is Context, Ownable {
         games[currentGameId].currentRandomness = randomnessCommitment;
     }
 
-    function increasePlayerAmount(
-        IncreasePlayerAmountData calldata data,
-        bytes32 randomness
-    ) external onlySignedByOwner(data) {
+    function increasePlayerAmount(IncreasePlayerAmountData calldata data, bytes32 randomness)
+        external
+        onlySignedByOwner(data)
+    {
         Game storage game = games[currentGameId];
         if (game.commitmentOpened) revert CommitmentAlreadyOpened();
         game.tree.insert(data.account, data.amount);
-        game.currentRandomness = keccak256(
-            abi.encode(game.currentRandomness, randomness)
-        );
+        game.currentRandomness = keccak256(abi.encode(game.currentRandomness, randomness));
     }
 
     function getPlayerAmount(address account) external view returns (uint256) {
@@ -106,33 +93,22 @@ contract Jackpot is Context, Ownable {
         return game.tree.get(account);
     }
 
-    function getWinner(
-        bytes calldata randomnessOpening
-    ) external returns (address) {
+    function getWinner(bytes calldata randomnessOpening) external returns (address) {
         Game storage game = games[currentGameId];
         console.log("randomnessOpening", uint256(keccak256(randomnessOpening)));
-        console.log(
-            "game.randomnessCommitment",
-            uint256(game.randomnessCommitment)
-        );
+        console.log("game.randomnessCommitment", uint256(game.randomnessCommitment));
         if (keccak256(randomnessOpening) != game.randomnessCommitment) {
             revert InvalidRandomnessOpening();
         }
         if (game.commitmentOpened) revert CommitmentAlreadyOpened();
         game.commitmentOpened = true;
-        uint256 currentRandomness = uint256(
-            keccak256(abi.encode(game.currentRandomness, randomnessOpening))
-        );
+        uint256 currentRandomness = uint256(keccak256(abi.encode(game.currentRandomness, randomnessOpening)));
         uint256 max = game.tree.totalSum;
         uint256 boundedRandomness = bound(currentRandomness, 0, max);
         return game.tree.getByPointOnInterval(boundedRandomness);
     }
 
-    function bound(
-        uint256 value,
-        uint256 min,
-        uint256 max
-    ) private pure returns (uint256) {
+    function bound(uint256 value, uint256 min, uint256 max) private pure returns (uint256) {
         uint256 range = max - min;
         while (range * (value / range) >= value) {
             value = uint256(keccak256(abi.encode(value)));
