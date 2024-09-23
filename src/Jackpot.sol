@@ -19,18 +19,10 @@ contract Jackpot is Context, Ownable {
         mapping(address => uint256) playerNonces;
     }
 
-    struct IncreasePlayerAmountData {
-        bytes32 gameId;
-        address account;
-        uint256 amount;
-        uint256 nonce;
-        Signature signature;
-    }
-
     struct Signature {
+        uint8 v;
         bytes32 r;
         bytes32 s;
-        uint8 v;
     }
 
     bytes32 private currentGameId;
@@ -43,14 +35,6 @@ contract Jackpot is Context, Ownable {
     error InvalidRandomnessOpening();
     error InvalidNonce();
     error InvalidGameId();
-
-    modifier onlySignedByOwner(IncreasePlayerAmountData calldata data) {
-        bytes32 hash = keccak256(abi.encode(data.gameId, data.account, data.amount, data.nonce));
-        if (ECDSA.recover(hash, data.signature.v, data.signature.r, data.signature.s) != owner()) {
-            revert ECDSA.ECDSAInvalidSignature();
-        }
-        _;
-    }
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
@@ -83,16 +67,24 @@ contract Jackpot is Context, Ownable {
         games[currentGameId].currentRandomness = randomnessCommitment;
     }
 
-    function increasePlayerAmount(IncreasePlayerAmountData calldata data, bytes32 randomness)
-        external
-        onlySignedByOwner(data)
-    {
-        if (data.gameId != currentGameId) revert InvalidGameId();
+    function increasePlayerAmount(
+        bytes32 gameId,
+        address account,
+        uint256 amount,
+        uint256 nonce,
+        Signature calldata signature,
+        bytes32 randomness
+    ) external {
+        bytes32 hash = keccak256(abi.encode(gameId, account, amount, nonce));
+        if (ECDSA.recover(hash, signature.v, signature.r, signature.s) != owner()) {
+            revert ECDSA.ECDSAInvalidSignature();
+        }
+        if (gameId != currentGameId) revert InvalidGameId();
         Game storage game = games[currentGameId];
         if (game.commitmentOpened) revert CommitmentAlreadyOpened();
-        if (data.nonce != game.playerNonces[data.account]) revert InvalidNonce();
-        game.playerNonces[data.account]++;
-        game.tree.insert(data.account, data.amount);
+        if (nonce != game.playerNonces[account]) revert InvalidNonce();
+        game.playerNonces[account]++;
+        game.tree.insert(account, amount);
         game.currentRandomness = keccak256(abi.encode(game.currentRandomness, randomness));
     }
 
@@ -101,7 +93,14 @@ contract Jackpot is Context, Ownable {
         return game.tree.get(account);
     }
 
-    function getWinner(bytes calldata randomnessOpening) external returns (address) {
+    function getWinner(bytes32 gameId, bytes calldata randomnessOpening, Signature calldata signature)
+        external
+        returns (address)
+    {
+        bytes32 hash = keccak256(abi.encode(gameId, randomnessOpening));
+        if (ECDSA.recover(hash, signature.v, signature.r, signature.s) != owner()) {
+            revert ECDSA.ECDSAInvalidSignature();
+        }
         Game storage game = games[currentGameId];
         if (keccak256(randomnessOpening) != game.randomnessCommitment) {
             revert InvalidRandomnessOpening();
