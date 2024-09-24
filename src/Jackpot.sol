@@ -32,6 +32,7 @@ contract Jackpot is Context, Ownable {
     event GameCreated(bytes32 indexed gameId, bytes32 randomnessCommitment);
     event PlayerAmountIncreased(bytes32 indexed gameId, address indexed player, uint256 amount, uint256 nonce);
     event WinnerDeclared(bytes32 indexed gameId, address winner);
+    event CrackTheEgg(bytes32 data);
 
     error GameAlreadyExists();
     error InvalidSignature();
@@ -70,6 +71,10 @@ contract Jackpot is Context, Ownable {
         games[currentGameId].randomnessCommitment = randomnessCommitment;
         games[currentGameId].currentRandomness = randomnessCommitment;
         emit GameCreated(currentGameId, randomnessCommitment);
+    }
+
+    function crackTheEgg(bytes32 data) external onlyOwner {
+        emit CrackTheEgg(data);
     }
 
     function increasePlayerAmount(
@@ -123,7 +128,7 @@ contract Jackpot is Context, Ownable {
 
     function bound(uint256 value, uint256 min, uint256 max) private pure returns (uint256) {
         uint256 range = max - min;
-        while (range * (value / range) >= value) {
+        while (range * (uint256(2**256-1) / range) < value) {
             value = uint256(keccak256(abi.encode(value)));
         }
         return min + (value % range);
