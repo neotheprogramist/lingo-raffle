@@ -12,6 +12,8 @@ contract JackpotTest is Test {
     address owner;
     address player1;
     address player2;
+    mapping(address => uint256) private playerNonces;
+
 
     function setUp() public {
         ownerPrivateKey = 1;
@@ -264,11 +266,43 @@ contract JackpotTest is Test {
     // Helper function to add a player with a signed message
     function addPlayer(address player, uint256 amount) internal {
         bytes32 randomnessCommitment = jackpot.getCurrentGameId();
-        uint256 nonce = 0;
+        uint256 nonce = playerNonces[player];
 
         bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, player, amount, nonce));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
 
         jackpot.increasePlayerAmount(randomnessCommitment, player, amount, nonce, Jackpot.Signature({r: r, s: s, v: v}), keccak256("randomness"));
+
+        playerNonces[player]++;    
+    }
+
+    //function to test multiple participation
+    function testMultipleParticipation() public {
+    // Setup a new game
+    bytes32 randomnessCommitment = keccak256(abi.encode("test"));
+    vm.prank(owner);
+    jackpot.newGame(randomnessCommitment);
+
+    // Add player1 multiple times with different amounts
+    addPlayer(player1, 100);
+    addPlayer(player1, 200);
+    addPlayer(player1, 300);
+
+    // Add player2 once
+    addPlayer(player2, 400);
+
+    // Check total amounts
+    assertEq(jackpot.getPlayerAmount(player1), 600);
+    assertEq(jackpot.getPlayerAmount(player2), 400);
+
+    // Get winner and check if it's either player1 or player2
+    bytes memory randomness = abi.encode("test");
+    bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, randomness));
+    (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
+    
+    vm.prank(owner);
+    address winner = jackpot.getWinner(randomnessCommitment, randomness, Jackpot.Signature({r: r, s: s, v: v}));
+
+        assertTrue(winner == player1 || winner == player2);
     }
 }
