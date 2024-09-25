@@ -16,6 +16,7 @@ contract Jackpot is Context, Ownable {
         bytes32 randomnessCommitment;
         bytes32 currentRandomness;
         bool commitmentOpened;
+        bool concluded;
         mapping(address => uint256) playerNonces;
     }
 
@@ -40,8 +41,13 @@ contract Jackpot is Context, Ownable {
     error InvalidRandomnessOpening();
     error InvalidNonce();
     error InvalidGameId();
+    error PreviousGameNotConcluded();
+    error GameAlreadyConcluded();
+    error NoParticipants();
 
-    constructor(address initialOwner) Ownable(initialOwner) {}
+    constructor(address initialOwner) Ownable(initialOwner) {
+        games[currentGameId].concluded = true;
+    }
 
     function getCurrentGameId() external view returns (bytes32) {
         return currentGameId;
@@ -64,8 +70,10 @@ contract Jackpot is Context, Ownable {
     }
 
     function newGame(bytes32 randomnessCommitment) external onlyOwner {
-        currentGameId = randomnessCommitment;
         if (gameExists[currentGameId]) revert GameAlreadyExists();
+        if (!games[currentGameId].concluded) revert PreviousGameNotConcluded();
+        currentGameId = randomnessCommitment;
+        games[currentGameId].concluded = false;
         gameExists[currentGameId] = true;
         games[currentGameId].tree.initialize();
         games[currentGameId].randomnessCommitment = randomnessCommitment;
@@ -91,6 +99,7 @@ contract Jackpot is Context, Ownable {
         }
         if (gameId != currentGameId) revert InvalidGameId();
         Game storage game = games[currentGameId];
+        if (game.concluded) revert GameAlreadyConcluded();
         if (game.commitmentOpened) revert CommitmentAlreadyOpened();
         if (nonce != game.playerNonces[account]) revert InvalidNonce();
         game.playerNonces[account]++;
@@ -118,6 +127,14 @@ contract Jackpot is Context, Ownable {
         }
         if (game.commitmentOpened) revert CommitmentAlreadyOpened();
         game.commitmentOpened = true;
+
+        game.concluded = true;
+
+        if (game.tree.totalSum == 0) {
+            emit WinnerDeclared(gameId, address(0));
+            return address(0);
+        }        
+
         uint256 currentRandomness = uint256(keccak256(abi.encode(game.currentRandomness, randomnessOpening)));
         uint256 max = game.tree.totalSum;
         uint256 boundedRandomness = bound(currentRandomness, 0, max);
@@ -127,6 +144,8 @@ contract Jackpot is Context, Ownable {
     }
 
     function bound(uint256 value, uint256 min, uint256 max) private pure returns (uint256) {
+        if (max < min){revert();}
+        if (min == max) return min;
         uint256 range = max - min;
         while (range * (uint256(2**256-1) / range) < value) {
             value = uint256(keccak256(abi.encode(value)));

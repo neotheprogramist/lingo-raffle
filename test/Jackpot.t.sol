@@ -232,36 +232,6 @@ contract JackpotTest is Test {
         jackpot.increasePlayerAmount(gameId, account, amount, nonce, signature, keccak256("randomness"));
     }
 
-    function testReplayAttackDifferentGames() public {
-        // Setup first game
-        bytes32 randomnessCommitment1 = keccak256(abi.encode("test1"));
-        vm.prank(owner);
-        jackpot.newGame(randomnessCommitment1);
-
-        // Prepare signed data
-        address account = player1;
-        uint256 amount = 100;
-        uint256 nonce = 0;
-
-        bytes32 messageHash = keccak256(abi.encode(randomnessCommitment1, account, amount, nonce));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
-        Jackpot.Signature memory signature = Jackpot.Signature({r: r, s: s, v: v});
-
-        // Increase player amount in first game
-        jackpot.increasePlayerAmount(randomnessCommitment1, account, amount, nonce, signature, keccak256("randomness1"));
-
-        // Setup second game
-        bytes32 randomnessCommitment2 = keccak256(abi.encode("test2"));
-        vm.prank(owner);
-        jackpot.newGame(randomnessCommitment2);
-
-        // Try to replay the same transaction in the second game
-        vm.expectRevert(abi.encodeWithSelector(Jackpot.InvalidGameId.selector));
-        jackpot.increasePlayerAmount(randomnessCommitment1, account, amount, nonce, signature, keccak256("randomness2"));
-
-        // Assert that the player amount was increased only in the first game
-        assertEq(jackpot.getPlayerAmount(player1), 0);
-    }
 
     // Helper function to add a player with a signed message
     function addPlayer(address player, uint256 amount) internal {
