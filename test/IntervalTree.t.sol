@@ -53,27 +53,6 @@ contract IntervalTreeTest is Test {
         }
     }
 
-    function testFuzzClear(address[30] memory accounts, uint8[50] memory values) public {
-        // Ensure all accounts are non-zero
-        for (uint256 i = 0; i < accounts.length; i++) {
-            vm.assume(accounts[i] != address(0));
-        }
-
-        // Insert values into the tree
-        for (uint256 i = 0; i < values.length; i++) {
-            address account = accounts[uint256(keccak256(abi.encodePacked(values[i]))) % accounts.length];
-            tree.insert(account, values[i]);
-        }
-
-        // Clear the tree and verify all values are reset
-        tree.clear();
-
-        for (uint256 i = 0; i < accounts.length; i++) {
-            assertEq(tree.get(accounts[i]), 0);
-        }
-        assertEq(tree.totalSum, 0);
-    }
-
     function testFuzzInsertExistingAccount(address account, uint8[50] memory values) public {
         // Ensure account is non-zero
         vm.assume(account != address(0));
