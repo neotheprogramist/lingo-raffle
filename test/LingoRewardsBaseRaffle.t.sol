@@ -396,6 +396,55 @@ contract LingoRewardsBaseRaffleTest is Test {
         assertTrue(winner == player1 || winner == player2 || winner == player3 || winner == player4);
     }
 
+    function testBenchmarkManyUsers() public {
+        uint256 seed = 0;
+        uint256 numUsers = 1000;
+        
+        bytes memory randomness = abi.encode("benchmark_test");
+        bytes32 randomnessCommitment = keccak256(randomness);
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
+
+        address[] memory users = new address[](numUsers);
+        uint256[] memory amounts = new uint256[](numUsers);
+        uint256 totalAmount = 0;
+
+        for (uint256 i = 0; i < numUsers; i++) {
+            users[i] = address(uint160(uint256(keccak256(abi.encode(seed, i)))));
+            amounts[i] = uint256(keccak256(abi.encode(seed, i, "amount"))) % 1000 + 1; // Random amount between 1 and 1000
+            totalAmount += amounts[i];
+            addPlayer(users[i], amounts[i]);
+        }
+
+        // Sign the randomness opening
+        bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, randomness));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
+
+        // Get winner
+        vm.prank(owner);
+        address winner = lingoRewardsBaseRaffle.getWinner(
+            randomnessCommitment, randomness, LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v})
+        );
+
+        // Verify the winner is one of the added users
+        bool isValidWinner = false;
+        for (uint256 i = 0; i < numUsers; i++) {
+            if (winner == users[i]) {
+                isValidWinner = true;
+                break;
+            }
+        }
+        assertTrue(isValidWinner, "Winner should be one of the added users");
+
+        // Verify total amount
+        assertEq(lingoRewardsBaseRaffle.getTotalSum(randomnessCommitment), totalAmount, "Total amount should match");
+
+        // Verify each user's amount
+        for (uint256 i = 0; i < numUsers; i++) {
+            assertEq(lingoRewardsBaseRaffle.getPlayerAmount(users[i]), amounts[i], "User amount should match");
+        }
+    }
+
     // Helper function to add a player with a signed message
     function addPlayer(address player, uint256 amount) internal {
         bytes32 randomnessCommitment = lingoRewardsBaseRaffle.getCurrentRaffleId();
