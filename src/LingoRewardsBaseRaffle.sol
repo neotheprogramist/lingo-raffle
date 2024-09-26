@@ -32,12 +32,7 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
     mapping(bytes32 => bool) private raffleExists;
 
     event RaffleCreated(bytes32 indexed raffleId, bytes32 randomnessCommitment);
-    event PlayerAmountIncreased(
-        bytes32 indexed raffleId,
-        address indexed player,
-        uint256 amount,
-        uint256 nonce
-    );
+    event PlayerAmountIncreased(bytes32 indexed raffleId, address indexed player, uint256 amount, uint256 nonce);
     event WinnerDeclared(bytes32 indexed raffleId, address winner);
 
     error RaffleAlreadyExists();
@@ -47,10 +42,7 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
     error InvalidNonce();
     error InvalidRaffleId();
 
-    constructor(
-        address initialOwner,
-        address initialSigner
-    ) Ownable(initialOwner) {
+    constructor(address initialOwner, address initialSigner) Ownable(initialOwner) {
         signer = initialSigner;
     }
 
@@ -70,21 +62,15 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
         return currentRaffleId;
     }
 
-    function getRaffleRandomnessCommitment(
-        bytes32 key
-    ) external view returns (bytes32) {
+    function getRaffleRandomnessCommitment(bytes32 key) external view returns (bytes32) {
         return raffles[key].randomnessCommitment;
     }
 
-    function getRaffleCurrentRandomness(
-        bytes32 key
-    ) external view returns (bytes32) {
+    function getRaffleCurrentRandomness(bytes32 key) external view returns (bytes32) {
         return raffles[key].currentRandomness;
     }
 
-    function getRaffleCommitmentOpened(
-        bytes32 key
-    ) external view returns (bool) {
+    function getRaffleCommitmentOpened(bytes32 key) external view returns (bool) {
         return raffles[key].commitmentOpened;
     }
 
@@ -92,9 +78,7 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
         return raffleExists[key];
     }
 
-    function newRaffle(
-        bytes32 randomnessCommitment
-    ) external whenNotPaused onlyOwner {
+    function newRaffle(bytes32 randomnessCommitment) external whenNotPaused onlyOwner {
         currentRaffleId = randomnessCommitment;
         if (raffleExists[currentRaffleId]) revert RaffleAlreadyExists();
         raffleExists[currentRaffleId] = true;
@@ -120,9 +104,7 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
         if (nonce != raffle.playerNonces[account]) revert InvalidNonce();
         raffle.playerNonces[account]++;
         raffle.tree.insert(account, amount);
-        raffle.currentRandomness = keccak256(
-            abi.encode(raffle.currentRandomness, randomness)
-        );
+        raffle.currentRandomness = keccak256(abi.encode(raffle.currentRandomness, randomness));
         emit PlayerAmountIncreased(raffleId, account, amount, nonce);
     }
 
@@ -131,11 +113,11 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
         return raffle.tree.get(account);
     }
 
-    function getWinner(
-        bytes32 raffleId,
-        bytes calldata randomnessOpening,
-        Signature calldata signature
-    ) external whenNotPaused returns (address) {
+    function getWinner(bytes32 raffleId, bytes calldata randomnessOpening, Signature calldata signature)
+        external
+        whenNotPaused
+        returns (address)
+    {
         bytes32 hash = keccak256(abi.encode(raffleId, randomnessOpening));
         checkSignature(hash, signature);
         Raffle storage raffle = raffles[currentRaffleId];
@@ -144,35 +126,28 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
         }
         if (raffle.commitmentOpened) revert CommitmentAlreadyOpened();
         raffle.commitmentOpened = true;
-        uint256 currentRandomness = uint256(
-            keccak256(abi.encode(raffle.currentRandomness, randomnessOpening))
-        );
+        uint256 currentRandomness = uint256(keccak256(abi.encode(raffle.currentRandomness, randomnessOpening)));
         uint256 max = raffle.tree.totalSum;
-        uint256 boundedRandomness = bound(currentRandomness, 0, max);
+        uint256 boundedRandomness = boundOrDefault(currentRandomness, 0, max);
         address winner = raffle.tree.getByPointOnInterval(boundedRandomness);
         emit WinnerDeclared(raffleId, winner);
         return winner;
     }
 
-    function bound(
-        uint256 value,
-        uint256 min,
-        uint256 max
-    ) private pure returns (uint256) {
-        uint256 range = max - min;
-        while (range * (type(uint256).max / range) <= value) {
-            value = uint256(keccak256(abi.encode(value)));
+    function boundOrDefault(uint256 value, uint256 min, uint256 max) private pure returns (uint256) {
+        if (max > min) {
+            uint256 range = max - min;
+            while (range * (type(uint256).max / range) <= value) {
+                value = uint256(keccak256(abi.encode(value)));
+            }
+            return min + (value % range);
+        } else {
+            return 0;
         }
-        return min + (value % range);
     }
 
-    function checkSignature(
-        bytes32 hash,
-        Signature memory signature
-    ) private view {
-        if (
-            ECDSA.recover(hash, signature.v, signature.r, signature.s) != signer
-        ) {
+    function checkSignature(bytes32 hash, Signature memory signature) private view {
+        if (ECDSA.recover(hash, signature.v, signature.r, signature.s) != signer) {
             revert ECDSA.ECDSAInvalidSignature();
         }
     }
