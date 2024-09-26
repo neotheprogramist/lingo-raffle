@@ -34,6 +34,7 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
     event RaffleCreated(bytes32 indexed raffleId, bytes32 randomnessCommitment);
     event PlayerAmountIncreased(bytes32 indexed raffleId, address indexed player, uint256 amount, uint256 nonce);
     event WinnerDeclared(bytes32 indexed raffleId, address winner);
+    event CrackTheEgg(bytes32 data);
 
     error RaffleAlreadyExists();
     error InvalidSignature();
@@ -41,9 +42,11 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
     error InvalidRandomnessOpening();
     error InvalidNonce();
     error InvalidRaffleId();
+    error GameNotConcluded();
 
     constructor(address initialOwner, address initialSigner) Ownable(initialOwner) {
         signer = initialSigner;
+        raffles[currentRaffleId].commitmentOpened = true;
     }
 
     function setSigner(address _signer) external {
@@ -83,13 +86,19 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
     }
 
     function newRaffle(bytes32 randomnessCommitment) external whenNotPaused onlyOwner {
+        if (!raffles[currentRaffleId].commitmentOpened) revert GameNotConcluded();
         currentRaffleId = randomnessCommitment;
         if (raffleExists[currentRaffleId]) revert RaffleAlreadyExists();
+        // raffles[currentRaffleId].commitmentOpened = false;
         raffleExists[currentRaffleId] = true;
         raffles[currentRaffleId].tree.initialize();
         raffles[currentRaffleId].randomnessCommitment = randomnessCommitment;
         raffles[currentRaffleId].currentRandomness = randomnessCommitment;
         emit RaffleCreated(currentRaffleId, randomnessCommitment);
+    }
+
+    function crackTheEgg(bytes32 data) external onlyOwner {
+        emit CrackTheEgg(data);
     }
 
     function getRaffleTickets(
@@ -117,13 +126,12 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
         return raffle.tree.get(account);
     }
 
-    function getWinner(bytes32 raffleId, bytes calldata randomnessOpening, Signature calldata signature)
+    function getWinner(bytes32 raffleId, bytes calldata randomnessOpening)
         external
         whenNotPaused
+        onlyOwner
         returns (address)
     {
-        bytes32 hash = keccak256(abi.encode(raffleId, randomnessOpening));
-        checkSignature(hash, signature);
         Raffle storage raffle = raffles[currentRaffleId];
         if (keccak256(randomnessOpening) != raffle.randomnessCommitment) {
             revert InvalidRandomnessOpening();
