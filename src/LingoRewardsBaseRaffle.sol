@@ -25,6 +25,7 @@ contract LingoRewardsBaseRaffle is Context, Ownable {
         bytes32 s;
     }
 
+    address private signer;
     bytes32 private currentRaffleId;
     mapping(bytes32 => Raffle) private raffles;
     mapping(bytes32 => bool) private raffleExists;
@@ -40,7 +41,13 @@ contract LingoRewardsBaseRaffle is Context, Ownable {
     error InvalidNonce();
     error InvalidRaffleId();
 
-    constructor(address initialOwner) Ownable(initialOwner) {}
+    constructor(address initialOwner, address initialSigner) Ownable(initialOwner) {
+        signer = initialSigner;
+    }
+
+    function setSigner(address _signer) external {
+        signer = _signer;
+    }
 
     function getCurrentRaffleId() external view returns (bytes32) {
         return currentRaffleId;
@@ -126,7 +133,7 @@ contract LingoRewardsBaseRaffle is Context, Ownable {
     }
 
     function checkSignature(bytes32 hash, Signature memory signature) private view {
-        if (ECDSA.recover(hash, signature.v, signature.r, signature.s) != owner()) {
+        if (ECDSA.recover(hash, signature.v, signature.r, signature.s) != signer) {
             revert ECDSA.ECDSAInvalidSignature();
         }
     }

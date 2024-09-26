@@ -9,17 +9,21 @@ import {console} from "forge-std/console.sol";
 contract LingoRewardsBaseRaffleTest is Test {
     LingoRewardsBaseRaffle lingoRewardsBaseRaffle;
     uint256 ownerPrivateKey;
+    uint256 signerPrivateKey;
     address owner;
+    address signer;
     address player1;
     address player2;
 
     function setUp() public {
         ownerPrivateKey = 1;
+        signerPrivateKey = 1;
         owner = vm.addr(ownerPrivateKey);
+        signer = vm.addr(signerPrivateKey);
         player1 = makeAddr("player1");
         player2 = makeAddr("player2");
         vm.prank(owner);
-        lingoRewardsBaseRaffle = new LingoRewardsBaseRaffle(owner);
+        lingoRewardsBaseRaffle = new LingoRewardsBaseRaffle(owner, signer);
     }
 
     function testNewGame() public {
@@ -45,7 +49,7 @@ contract LingoRewardsBaseRaffleTest is Test {
         uint256 nonce = 0;
 
         bytes32 messageHash = keccak256(abi.encode(gameId, account, amount, nonce));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
 
         // Increase player amount
         lingoRewardsBaseRaffle.getRaffleTickets(
@@ -74,7 +78,7 @@ contract LingoRewardsBaseRaffleTest is Test {
         uint256 nonce = 0;
 
         bytes32 messageHash = keccak256(abi.encode(gameId, account, amount, nonce));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
 
         // Increase player amount
         lingoRewardsBaseRaffle.getRaffleTickets(
@@ -125,7 +129,7 @@ contract LingoRewardsBaseRaffleTest is Test {
 
         // Sign the randomness opening
         bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, randomness));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
 
         // Get winner
         vm.prank(owner);
@@ -150,7 +154,7 @@ contract LingoRewardsBaseRaffleTest is Test {
 
         // Sign the randomness opening
         bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, randomness));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
 
         // Get winner with boundary values
         vm.prank(owner);
@@ -204,7 +208,7 @@ contract LingoRewardsBaseRaffleTest is Test {
 
         // Sign the randomness opening
         bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, randomness));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
         LingoRewardsBaseRaffle.Signature memory signature = LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v});
 
         // Get winner for the first time
@@ -227,7 +231,7 @@ contract LingoRewardsBaseRaffleTest is Test {
 
         bytes memory invalidRandomness = abi.encode("invalid");
         bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, invalidRandomness));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
         LingoRewardsBaseRaffle.Signature memory signature = LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v});
 
         vm.expectRevert(LingoRewardsBaseRaffle.InvalidRandomnessOpening.selector);
@@ -247,7 +251,7 @@ contract LingoRewardsBaseRaffleTest is Test {
         uint256 nonce = 0;
 
         bytes32 messageHash = keccak256(abi.encode(gameId, account, amount, nonce));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
         LingoRewardsBaseRaffle.Signature memory signature = LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v});
 
         // Increase player amount
@@ -270,7 +274,7 @@ contract LingoRewardsBaseRaffleTest is Test {
         uint256 nonce = 0;
 
         bytes32 messageHash = keccak256(abi.encode(randomnessCommitment1, account, amount, nonce));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
         LingoRewardsBaseRaffle.Signature memory signature = LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v});
 
         // Increase player amount in first game
@@ -299,7 +303,7 @@ contract LingoRewardsBaseRaffleTest is Test {
         uint256 nonce = 0;
 
         bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, player, amount, nonce));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
 
         lingoRewardsBaseRaffle.getRaffleTickets(
             randomnessCommitment,
