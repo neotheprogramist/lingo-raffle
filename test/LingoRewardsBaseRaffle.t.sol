@@ -521,7 +521,6 @@ contract LingoRewardsBaseRaffleTest is Test {
         );
     }
 
-
     function testGetWinnerWithZeroTotalSum() public {
         bytes memory randomness = abi.encode("test");
         bytes32 randomnessCommitment = keccak256(randomness);
