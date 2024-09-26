@@ -464,4 +464,87 @@ contract LingoRewardsBaseRaffleTest is Test {
 
         assertTrue(winner == player1 || winner == player2);
     }
+
+    function testNewRaffleWhenGameNotConcluded() public {
+        bytes32 randomnessCommitment1 = keccak256(abi.encode("test1"));
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment1);
+
+        bytes32 randomnessCommitment2 = keccak256(abi.encode("test2"));
+        vm.prank(owner);
+        vm.expectRevert(LingoRewardsBaseRaffle.GameNotConcluded.selector);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment2);
+    }
+
+    function testGetRaffleTicketsInvalidRaffleId() public {
+        bytes32 randomnessCommitment = keccak256(abi.encode("test"));
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
+
+        bytes32 invalidRaffleId = keccak256(abi.encode("invalid"));
+        bytes32 messageHash = keccak256(abi.encode(invalidRaffleId, player1, 100, 0));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
+
+        vm.expectRevert(LingoRewardsBaseRaffle.InvalidRaffleId.selector);
+        lingoRewardsBaseRaffle.getRaffleTickets(
+            invalidRaffleId,
+            player1,
+            100,
+            0,
+            LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v}),
+            keccak256("randomness")
+        );
+    }
+
+    function testGetRaffleTicketsCommitmentAlreadyOpened() public {
+        bytes memory randomness = abi.encode("test");
+        bytes32 randomnessCommitment = keccak256(randomness);
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
+
+        addPlayer(player1, 100);
+
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.getWinner(randomnessCommitment, randomness);
+
+        bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, player2, 200, 0));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
+
+        vm.expectRevert(LingoRewardsBaseRaffle.CommitmentAlreadyOpened.selector);
+        lingoRewardsBaseRaffle.getRaffleTickets(
+            randomnessCommitment,
+            player2,
+            200,
+            0,
+            LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v}),
+            keccak256("randomness")
+        );
+    }
+
+
+    function testGetWinnerWithZeroTotalSum() public {
+        bytes memory randomness = abi.encode("test");
+        bytes32 randomnessCommitment = keccak256(randomness);
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
+
+        vm.prank(owner);
+        address winner = lingoRewardsBaseRaffle.getWinner(randomnessCommitment, randomness);
+
+        assertEq(winner, address(0));
+    }
+
+    function testBoundOrDefaultWithEqualMinMax() public {
+        bytes memory randomness = abi.encode("test");
+        bytes32 randomnessCommitment = keccak256(randomness);
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
+
+        addPlayer(player1, 0);
+
+        vm.prank(owner);
+        address winner = lingoRewardsBaseRaffle.getWinner(randomnessCommitment, randomness);
+
+        assertEq(winner, address(0));
+    }
 }
