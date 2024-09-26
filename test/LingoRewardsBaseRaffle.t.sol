@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 import {LingoRewardsBaseRaffle} from "../src/LingoRewardsBaseRaffle.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {console} from "forge-std/console.sol";
 
@@ -295,6 +296,104 @@ contract LingoRewardsBaseRaffleTest is Test {
 
         // Assert that the player amount was increased only in the first game
         assertEq(lingoRewardsBaseRaffle.getPlayerAmount(player1), 0);
+    }
+
+    function testSetSigner() public {
+        uint256 newSignerPrivateKey = 3;
+        address newSigner = vm.addr(newSignerPrivateKey);
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.setSigner(newSigner);
+
+        // Prepare signed data with new signer
+        bytes32 randomnessCommitment = keccak256(abi.encode("test"));
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
+
+        bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, player1, 100, 0));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(newSignerPrivateKey, messageHash);
+
+        // Increase player amount with new signer
+        lingoRewardsBaseRaffle.getRaffleTickets(
+            randomnessCommitment,
+            player1,
+            100,
+            0,
+            LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v}),
+            keccak256("randomness")
+        );
+
+        // Assert that the player amount was increased correctly
+        assertEq(lingoRewardsBaseRaffle.getPlayerAmount(player1), 100);
+    }
+
+    function testPauseAndUnpause() public {
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.pause();
+
+        bytes32 randomnessCommitment = keccak256(abi.encode("test"));
+        vm.prank(owner);
+        vm.expectRevert(Pausable.EnforcedPause.selector);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
+
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.unpause();
+
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
+        assertTrue(lingoRewardsBaseRaffle.getRaffleExists(randomnessCommitment));
+    }
+
+    function testGetRaffleDetails() public {
+        bytes32 randomnessCommitment = keccak256(abi.encode("test"));
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
+
+        assertEq(lingoRewardsBaseRaffle.getRaffleRandomnessCommitment(randomnessCommitment), randomnessCommitment);
+        assertEq(lingoRewardsBaseRaffle.getRaffleCurrentRandomness(randomnessCommitment), randomnessCommitment);
+        assertFalse(lingoRewardsBaseRaffle.getRaffleCommitmentOpened(randomnessCommitment));
+        assertTrue(lingoRewardsBaseRaffle.getRaffleExists(randomnessCommitment));
+    }
+
+    function testGetWinnerWithNoPlayers() public {
+        bytes memory randomness = abi.encode("test");
+        bytes32 randomnessCommitment = keccak256(randomness);
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
+
+        bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, randomness));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
+
+        vm.prank(owner);
+        address winner = lingoRewardsBaseRaffle.getWinner(
+            randomnessCommitment, randomness, LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v})
+        );
+
+        assertEq(winner, address(0));
+    }
+
+    function testMultiplePlayersWithDifferentAmounts() public {
+        bytes memory randomness = abi.encode("test");
+        bytes32 randomnessCommitment = keccak256(randomness);
+        vm.prank(owner);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
+
+        address player3 = makeAddr("player3");
+        address player4 = makeAddr("player4");
+
+        addPlayer(player1, 100);
+        addPlayer(player2, 200);
+        addPlayer(player3, 50);
+        addPlayer(player4, 150);
+
+        bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, randomness));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
+
+        vm.prank(owner);
+        address winner = lingoRewardsBaseRaffle.getWinner(
+            randomnessCommitment, randomness, LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v})
+        );
+
+        assertTrue(winner == player1 || winner == player2 || winner == player3 || winner == player4);
     }
 
     // Helper function to add a player with a signed message
