@@ -78,6 +78,10 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
         return raffleExists[key];
     }
 
+    function getTotalSum(bytes32 key) external view returns (uint256) {
+        return raffles[key].tree.totalSum;
+    }
+
     function newRaffle(bytes32 randomnessCommitment) external whenNotPaused onlyOwner {
         currentRaffleId = randomnessCommitment;
         if (raffleExists[currentRaffleId]) revert RaffleAlreadyExists();
