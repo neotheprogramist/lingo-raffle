@@ -2,12 +2,12 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
-import "../src/Jackpot.sol";
+import {LingoRewardsBaseRaffle} from "../src/LingoRewardsBaseRaffle.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {console} from "forge-std/console.sol";
 
-contract JackpotTest is Test {
-    Jackpot jackpot;
+contract LingoRewardsBaseRaffleTest is Test {
+    LingoRewardsBaseRaffle lingoRewardsBaseRaffle;
     uint256 ownerPrivateKey;
     address owner;
     address player1;
@@ -19,24 +19,24 @@ contract JackpotTest is Test {
         player1 = makeAddr("player1");
         player2 = makeAddr("player2");
         vm.prank(owner);
-        jackpot = new Jackpot(owner);
+        lingoRewardsBaseRaffle = new LingoRewardsBaseRaffle(owner);
     }
 
     function testNewGame() public {
         bytes32 randomnessCommitment = keccak256(abi.encode("test"));
         vm.prank(owner);
-        jackpot.newGame(randomnessCommitment);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
 
         // Add assertions to check if the game was created correctly
-        assertTrue(jackpot.getGameExists(randomnessCommitment));
-        assertEq(jackpot.getCurrentGameId(), randomnessCommitment);
+        assertTrue(lingoRewardsBaseRaffle.getRaffleExists(randomnessCommitment));
+        assertEq(lingoRewardsBaseRaffle.getCurrentRaffleId(), randomnessCommitment);
     }
 
     function testIncreasePlayerAmount() public {
         // Setup a new game
         bytes32 randomnessCommitment = keccak256(abi.encode("test"));
         vm.prank(owner);
-        jackpot.newGame(randomnessCommitment);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
 
         // Prepare signed data
         bytes32 gameId = randomnessCommitment;
@@ -48,17 +48,24 @@ contract JackpotTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
 
         // Increase player amount
-        jackpot.increasePlayerAmount(gameId, account, amount, nonce, Jackpot.Signature({r: r, s: s, v: v}), keccak256("randomness"));
+        lingoRewardsBaseRaffle.getRaffleTickets(
+            gameId,
+            account,
+            amount,
+            nonce,
+            LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v}),
+            keccak256("randomness")
+        );
 
         // Add assertions to check if the player amount was increased correctly
-        assertEq(jackpot.getPlayerAmount(player1), 100);
+        assertEq(lingoRewardsBaseRaffle.getPlayerAmount(player1), 100);
     }
 
     function testIncreasePlayerAmountZero() public {
         // Setup a new game
         bytes32 randomnessCommitment = keccak256(abi.encode("test"));
         vm.prank(owner);
-        jackpot.newGame(randomnessCommitment);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
 
         // Prepare signed data with zero amount
         bytes32 gameId = randomnessCommitment;
@@ -70,17 +77,24 @@ contract JackpotTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
 
         // Increase player amount
-        jackpot.increasePlayerAmount(gameId, account, amount, nonce, Jackpot.Signature({r: r, s: s, v: v}), keccak256("randomness"));
+        lingoRewardsBaseRaffle.getRaffleTickets(
+            gameId,
+            account,
+            amount,
+            nonce,
+            LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v}),
+            keccak256("randomness")
+        );
 
         // Add assertions to check if the player amount was increased correctly
-        assertEq(jackpot.getPlayerAmount(player1), 0);
+        assertEq(lingoRewardsBaseRaffle.getPlayerAmount(player1), 0);
     }
 
     function testIncreasePlayerAmountInvalidSignature() public {
         // Setup a new game
         bytes32 randomnessCommitment = keccak256(abi.encode("test"));
         vm.prank(owner);
-        jackpot.newGame(randomnessCommitment);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
 
         // Prepare data with invalid owner signature
         bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, player1, 100, 0));
@@ -88,7 +102,14 @@ contract JackpotTest is Test {
 
         // Attempt to increase player amount with invalid signature
         vm.expectRevert(abi.encodeWithSelector(ECDSA.ECDSAInvalidSignature.selector));
-        jackpot.increasePlayerAmount(randomnessCommitment, player1, 100, 0, Jackpot.Signature({r: r, s: s, v: v}), keccak256("randomness"));
+        lingoRewardsBaseRaffle.getRaffleTickets(
+            randomnessCommitment,
+            player1,
+            100,
+            0,
+            LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v}),
+            keccak256("randomness")
+        );
     }
 
     function testGetWinner() public {
@@ -96,7 +117,7 @@ contract JackpotTest is Test {
         // Setup a new game and add players
         bytes32 randomnessCommitment = keccak256(randomness);
         vm.prank(owner);
-        jackpot.newGame(randomnessCommitment);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
 
         // Add multiple players
         addPlayer(player1, 100);
@@ -108,7 +129,9 @@ contract JackpotTest is Test {
 
         // Get winner
         vm.prank(owner);
-        address winner = jackpot.getWinner(randomnessCommitment, randomness, Jackpot.Signature({r: r, s: s, v: v}));
+        address winner = lingoRewardsBaseRaffle.getWinner(
+            randomnessCommitment, randomness, LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v})
+        );
 
         // Add assertions to check if a winner was selected correctly
         assertTrue(winner == player1 || winner == player2);
@@ -119,7 +142,7 @@ contract JackpotTest is Test {
         // Setup a new game and add players
         bytes32 randomnessCommitment = keccak256(randomness);
         vm.prank(owner);
-        jackpot.newGame(randomnessCommitment);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
 
         // Add multiple players
         addPlayer(player1, 100);
@@ -131,7 +154,9 @@ contract JackpotTest is Test {
 
         // Get winner with boundary values
         vm.prank(owner);
-        address winner = jackpot.getWinner(randomnessCommitment, randomness, Jackpot.Signature({r: r, s: s, v: v}));
+        address winner = lingoRewardsBaseRaffle.getWinner(
+            randomnessCommitment, randomness, LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v})
+        );
 
         // Add assertions to check if a winner was selected correctly
         assertTrue(winner == player1 || winner == player2);
@@ -140,30 +165,33 @@ contract JackpotTest is Test {
     function testNewGameAlreadyExists() public {
         bytes32 randomnessCommitment = keccak256(abi.encode("test"));
         vm.prank(owner);
-        jackpot.newGame(randomnessCommitment);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
 
         // Attempt to create a game with the same randomnessCommitment
         vm.prank(owner);
-        vm.expectRevert(Jackpot.GameAlreadyExists.selector);
-        jackpot.newGame(randomnessCommitment);
+        vm.expectRevert(LingoRewardsBaseRaffle.RaffleAlreadyExists.selector);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
     }
 
     function testInvalidSignature() public {
         // Setup a new game
         bytes32 randomnessCommitment = keccak256(abi.encode("test"));
         vm.prank(owner);
-        jackpot.newGame(randomnessCommitment);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
 
         // Prepare data with invalid signature
         bytes32 gameId = randomnessCommitment;
         address account = player1;
         uint256 amount = 100;
         uint256 nonce = 0;
-        Jackpot.Signature memory invalidSignature = Jackpot.Signature({r: bytes32(0), s: bytes32(0), v: 0});
+        LingoRewardsBaseRaffle.Signature memory invalidSignature =
+            LingoRewardsBaseRaffle.Signature({r: bytes32(0), s: bytes32(0), v: 0});
 
         // Attempt to increase player amount with invalid signature
         vm.expectRevert(abi.encodeWithSelector(ECDSA.ECDSAInvalidSignature.selector));
-        jackpot.increasePlayerAmount(gameId, account, amount, nonce, invalidSignature, keccak256("randomness"));
+        lingoRewardsBaseRaffle.getRaffleTickets(
+            gameId, account, amount, nonce, invalidSignature, keccak256("randomness")
+        );
     }
 
     function testCommitmentAlreadyOpened() public {
@@ -171,22 +199,22 @@ contract JackpotTest is Test {
         bytes memory randomness = abi.encode("test");
         bytes32 randomnessCommitment = keccak256(randomness);
         vm.prank(owner);
-        jackpot.newGame(randomnessCommitment);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
         addPlayer(player1, 100);
 
         // Sign the randomness opening
         bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, randomness));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
-        Jackpot.Signature memory signature = Jackpot.Signature({r: r, s: s, v: v});
+        LingoRewardsBaseRaffle.Signature memory signature = LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v});
 
         // Get winner for the first time
         vm.prank(owner);
-        jackpot.getWinner(randomnessCommitment, randomness, signature);
+        lingoRewardsBaseRaffle.getWinner(randomnessCommitment, randomness, signature);
 
         // Attempt to get winner for the second time
         vm.prank(owner);
-        vm.expectRevert(Jackpot.CommitmentAlreadyOpened.selector);
-        jackpot.getWinner(randomnessCommitment, randomness, signature);
+        vm.expectRevert(LingoRewardsBaseRaffle.CommitmentAlreadyOpened.selector);
+        lingoRewardsBaseRaffle.getWinner(randomnessCommitment, randomness, signature);
     }
 
     function testInvalidRandomnessOpening() public {
@@ -194,23 +222,23 @@ contract JackpotTest is Test {
         bytes memory randomness = abi.encode("test");
         bytes32 randomnessCommitment = keccak256(randomness);
         vm.prank(owner);
-        jackpot.newGame(randomnessCommitment);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
         addPlayer(player1, 100);
 
         bytes memory invalidRandomness = abi.encode("invalid");
         bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, invalidRandomness));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
-        Jackpot.Signature memory signature = Jackpot.Signature({r: r, s: s, v: v});
+        LingoRewardsBaseRaffle.Signature memory signature = LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v});
 
-        vm.expectRevert(Jackpot.InvalidRandomnessOpening.selector);
-        jackpot.getWinner(randomnessCommitment, invalidRandomness, signature);
+        vm.expectRevert(LingoRewardsBaseRaffle.InvalidRandomnessOpening.selector);
+        lingoRewardsBaseRaffle.getWinner(randomnessCommitment, invalidRandomness, signature);
     }
 
     function testReplayAttackSameGame() public {
         // Setup a new game
         bytes32 randomnessCommitment = keccak256(abi.encode("test"));
         vm.prank(owner);
-        jackpot.newGame(randomnessCommitment);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment);
 
         // Prepare signed data
         bytes32 gameId = randomnessCommitment;
@@ -220,21 +248,21 @@ contract JackpotTest is Test {
 
         bytes32 messageHash = keccak256(abi.encode(gameId, account, amount, nonce));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
-        Jackpot.Signature memory signature = Jackpot.Signature({r: r, s: s, v: v});
+        LingoRewardsBaseRaffle.Signature memory signature = LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v});
 
         // Increase player amount
-        jackpot.increasePlayerAmount(gameId, account, amount, nonce, signature, keccak256("randomness"));
+        lingoRewardsBaseRaffle.getRaffleTickets(gameId, account, amount, nonce, signature, keccak256("randomness"));
 
         // Try to replay the same transaction in the same game
-        vm.expectRevert(Jackpot.InvalidNonce.selector);
-        jackpot.increasePlayerAmount(gameId, account, amount, nonce, signature, keccak256("randomness"));
+        vm.expectRevert(LingoRewardsBaseRaffle.InvalidNonce.selector);
+        lingoRewardsBaseRaffle.getRaffleTickets(gameId, account, amount, nonce, signature, keccak256("randomness"));
     }
 
     function testReplayAttackDifferentGames() public {
         // Setup first game
         bytes32 randomnessCommitment1 = keccak256(abi.encode("test1"));
         vm.prank(owner);
-        jackpot.newGame(randomnessCommitment1);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment1);
 
         // Prepare signed data
         address account = player1;
@@ -243,32 +271,43 @@ contract JackpotTest is Test {
 
         bytes32 messageHash = keccak256(abi.encode(randomnessCommitment1, account, amount, nonce));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
-        Jackpot.Signature memory signature = Jackpot.Signature({r: r, s: s, v: v});
+        LingoRewardsBaseRaffle.Signature memory signature = LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v});
 
         // Increase player amount in first game
-        jackpot.increasePlayerAmount(randomnessCommitment1, account, amount, nonce, signature, keccak256("randomness1"));
+        lingoRewardsBaseRaffle.getRaffleTickets(
+            randomnessCommitment1, account, amount, nonce, signature, keccak256("randomness1")
+        );
 
         // Setup second game
         bytes32 randomnessCommitment2 = keccak256(abi.encode("test2"));
         vm.prank(owner);
-        jackpot.newGame(randomnessCommitment2);
+        lingoRewardsBaseRaffle.newRaffle(randomnessCommitment2);
 
         // Try to replay the same transaction in the second game
-        vm.expectRevert(abi.encodeWithSelector(Jackpot.InvalidGameId.selector));
-        jackpot.increasePlayerAmount(randomnessCommitment1, account, amount, nonce, signature, keccak256("randomness2"));
+        vm.expectRevert(abi.encodeWithSelector(LingoRewardsBaseRaffle.InvalidRaffleId.selector));
+        lingoRewardsBaseRaffle.getRaffleTickets(
+            randomnessCommitment1, account, amount, nonce, signature, keccak256("randomness2")
+        );
 
         // Assert that the player amount was increased only in the first game
-        assertEq(jackpot.getPlayerAmount(player1), 0);
+        assertEq(lingoRewardsBaseRaffle.getPlayerAmount(player1), 0);
     }
 
     // Helper function to add a player with a signed message
     function addPlayer(address player, uint256 amount) internal {
-        bytes32 randomnessCommitment = jackpot.getCurrentGameId();
+        bytes32 randomnessCommitment = lingoRewardsBaseRaffle.getCurrentRaffleId();
         uint256 nonce = 0;
 
         bytes32 messageHash = keccak256(abi.encode(randomnessCommitment, player, amount, nonce));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerPrivateKey, messageHash);
 
-        jackpot.increasePlayerAmount(randomnessCommitment, player, amount, nonce, Jackpot.Signature({r: r, s: s, v: v}), keccak256("randomness"));
+        lingoRewardsBaseRaffle.getRaffleTickets(
+            randomnessCommitment,
+            player,
+            amount,
+            nonce,
+            LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v}),
+            keccak256("randomness")
+        );
     }
 }

@@ -6,7 +6,6 @@ library IntervalTree {
         address root;
         uint256 totalSum;
         mapping(address => Node) nodes;
-        address[] nodeAddresses;
     }
 
     struct Node {
@@ -48,7 +47,6 @@ library IntervalTree {
 
         if (current == address(0)) {
             self.nodes[account].value = amount;
-            self.nodeAddresses.push(account);
         } else {
             self.nodes[current].value += amount;
         }
@@ -87,15 +85,5 @@ library IntervalTree {
         }
 
         return address(0); // Point not found
-    }
-
-    function clear(Tree storage self) internal {
-        for (uint256 i = 0; i < self.nodeAddresses.length; ++i) {
-            delete self.nodes[self.nodeAddresses[i]];
-        }
-        delete self.nodeAddresses;
-
-        self.nodes[self.root] = Node(0, address(0), 0, address(0), 0);
-        self.totalSum = 0;
     }
 }
