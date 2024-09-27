@@ -61,7 +61,7 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
 
     /// @notice Sets a new signer address
     /// @param _signer The new signer address
-    function setSigner(address _signer) external {
+    function setSigner(address _signer) external onlyOwner {
         signer = _signer;
     }
 
