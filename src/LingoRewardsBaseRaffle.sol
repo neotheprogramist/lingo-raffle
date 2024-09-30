@@ -41,7 +41,7 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
     event RaffleCreated(bytes32 indexed raffleId, bytes32 randomnessCommitment);
     event PlayerAmountIncreased(bytes32 indexed raffleId, address indexed player, uint256 amount, uint256 nonce);
     event WinnerDeclared(bytes32 indexed raffleId, address winner);
-    event CrackTheEgg(bytes32 data);
+    event CrackTheEgg(address sender, uint256 timestamp, bytes data);
 
     error RaffleAlreadyExists();
     error InvalidSignature();
@@ -129,10 +129,10 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
         emit RaffleCreated(currentRaffleId, randomnessCommitment);
     }
 
-    /// @notice Emits an event with the provided data
+    /// @notice Emits an event with the provided data, sender's address, and current timestamp
     /// @param data The data to be included in the event
-    function crackTheEgg(bytes32 data) external {
-        emit CrackTheEgg(data);
+    function crackTheEgg(bytes calldata data) external {
+        emit CrackTheEgg(_msgSender(), block.timestamp, data);
     }
 
     /// @notice Allows a player to get raffle tickets
