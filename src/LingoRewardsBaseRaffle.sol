@@ -131,7 +131,7 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
 
     /// @notice Emits an event with the provided data
     /// @param data The data to be included in the event
-    function crackTheEgg(bytes32 data) external onlyOwner {
+    function crackTheEgg(bytes32 data) external {
         emit CrackTheEgg(data);
     }
 
