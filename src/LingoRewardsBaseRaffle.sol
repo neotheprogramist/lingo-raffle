@@ -31,8 +31,6 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
 
     /// @notice Address of the signer for validating signatures
     address private signer;
-    /// @notice ID of the current active raffle
-    bytes32 private currentRaffleId;
     /// @notice Mapping of raffle IDs to Raffle structs
     mapping(bytes32 => Raffle) private raffles;
     /// @notice Mapping to check if a raffle exists
@@ -44,6 +42,7 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
     event CrackTheEgg(address sender, uint256 timestamp, bytes data);
 
     error RaffleAlreadyExists();
+    error RaffleDoesNotExist();
     error InvalidSignature();
     error CommitmentAlreadyOpened();
     error InvalidRandomnessOpening();
@@ -56,7 +55,6 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
     /// @param initialSigner Address of the initial signer for signature validation
     constructor(address initialOwner, address initialSigner) Ownable(initialOwner) {
         signer = initialSigner;
-        raffles[currentRaffleId].commitmentOpened = true;
     }
 
     /// @notice Sets a new signer address
@@ -75,10 +73,10 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
         _unpause();
     }
 
-    /// @notice Retrieves the current raffle ID
-    /// @return The current raffle ID
-    function getCurrentRaffleId() external view returns (bytes32) {
-        return currentRaffleId;
+    /// @notice Emits an event with the provided data, sender's address, and current timestamp
+    /// @param data The data to be included in the event
+    function crackTheEgg(bytes calldata data) external {
+        emit CrackTheEgg(_msgSender(), block.timestamp, data);
     }
 
     /// @notice Retrieves the randomness commitment for a given raffle ID
@@ -118,21 +116,13 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
 
     /// @notice Creates a new raffle
     /// @param randomnessCommitment The commitment for the raffle's randomness
-    function newRaffle(bytes32 randomnessCommitment) external whenNotPaused onlyOwner {
-        if (!raffles[currentRaffleId].commitmentOpened) revert GameNotConcluded();
-        currentRaffleId = randomnessCommitment;
-        if (raffleExists[currentRaffleId]) revert RaffleAlreadyExists();
-        raffleExists[currentRaffleId] = true;
-        raffles[currentRaffleId].tree.initialize();
-        raffles[currentRaffleId].randomnessCommitment = randomnessCommitment;
-        raffles[currentRaffleId].currentRandomness = randomnessCommitment;
-        emit RaffleCreated(currentRaffleId, randomnessCommitment);
-    }
-
-    /// @notice Emits an event with the provided data, sender's address, and current timestamp
-    /// @param data The data to be included in the event
-    function crackTheEgg(bytes calldata data) external {
-        emit CrackTheEgg(_msgSender(), block.timestamp, data);
+    function newRaffle(bytes32 raffleId, bytes32 randomnessCommitment) external whenNotPaused onlyOwner {
+        if (raffleExists[raffleId]) revert RaffleAlreadyExists();
+        raffleExists[raffleId] = true;
+        raffles[raffleId].tree.initialize();
+        raffles[raffleId].randomnessCommitment = randomnessCommitment;
+        raffles[raffleId].currentRandomness = randomnessCommitment;
+        emit RaffleCreated(raffleId, randomnessCommitment);
     }
 
     /// @notice Allows a player to get raffle tickets
@@ -150,10 +140,10 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
         Signature calldata signature,
         bytes32 randomness
     ) external whenNotPaused {
+        if (!raffleExists[raffleId]) revert RaffleDoesNotExist();
         bytes32 hash = keccak256(abi.encode(raffleId, account, amount, nonce));
         checkSignature(hash, signature);
-        if (raffleId != currentRaffleId) revert InvalidRaffleId();
-        Raffle storage raffle = raffles[currentRaffleId];
+        Raffle storage raffle = raffles[raffleId];
         if (raffle.commitmentOpened) revert CommitmentAlreadyOpened();
         if (nonce != raffle.playerNonces[account]) revert InvalidNonce();
         raffle.playerNonces[account]++;
@@ -165,8 +155,8 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
     /// @notice Retrieves the amount of tickets for a player in the current raffle
     /// @param account The address of the player
     /// @return The amount of tickets for the player
-    function getPlayerAmount(address account) external view returns (uint256) {
-        Raffle storage raffle = raffles[currentRaffleId];
+    function getPlayerAmount(bytes32 raffleId, address account) external view returns (uint256) {
+        Raffle storage raffle = raffles[raffleId];
         return raffle.tree.get(account);
     }
 
@@ -180,7 +170,7 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
         onlyOwner
         returns (address)
     {
-        Raffle storage raffle = raffles[currentRaffleId];
+        Raffle storage raffle = raffles[raffleId];
         if (keccak256(randomnessOpening) != raffle.randomnessCommitment) {
             revert InvalidRandomnessOpening();
         }
