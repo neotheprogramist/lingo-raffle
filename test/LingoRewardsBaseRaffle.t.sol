@@ -36,10 +36,7 @@ contract LingoRewardsBaseRaffleTest is Test {
 
         // Add assertions to check if the game was created correctly
         assertTrue(lingoRewardsBaseRaffle.getRaffleExists(raffleId));
-        assertEq(
-            lingoRewardsBaseRaffle.getRaffleRandomnessCommitment(raffleId),
-            randomnessCommitment
-        );
+        assertEq(lingoRewardsBaseRaffle.getRaffleRandomnessCommitment(raffleId), randomnessCommitment);
     }
 
     function testIncreasePlayerAmount() public {
@@ -54,13 +51,8 @@ contract LingoRewardsBaseRaffleTest is Test {
         uint256 amount = 100;
         uint256 nonce = 0;
 
-        bytes32 messageHash = keccak256(
-            abi.encode(raffleId, account, amount, nonce)
-        );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signerPrivateKey,
-            messageHash
-        );
+        bytes32 messageHash = keccak256(abi.encode(raffleId, account, amount, nonce));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
 
         // Increase player amount
         lingoRewardsBaseRaffle.getRaffleTickets(
@@ -73,10 +65,7 @@ contract LingoRewardsBaseRaffleTest is Test {
         );
 
         // Add assertions to check if the player amount was increased correctly
-        assertEq(
-            lingoRewardsBaseRaffle.getPlayerAmount(raffleId, player1),
-            100
-        );
+        assertEq(lingoRewardsBaseRaffle.getPlayerAmount(raffleId, player1), 100);
     }
 
     function testIncreasePlayerAmountZero() public {
@@ -91,13 +80,8 @@ contract LingoRewardsBaseRaffleTest is Test {
         uint256 amount = 0;
         uint256 nonce = 0;
 
-        bytes32 messageHash = keccak256(
-            abi.encode(raffleId, account, amount, nonce)
-        );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signerPrivateKey,
-            messageHash
-        );
+        bytes32 messageHash = keccak256(abi.encode(raffleId, account, amount, nonce));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
 
         // Increase player amount
         lingoRewardsBaseRaffle.getRaffleTickets(
@@ -125,16 +109,9 @@ contract LingoRewardsBaseRaffleTest is Test {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(2, messageHash); // Using a different private key
 
         // Attempt to increase player amount with invalid signature
-        vm.expectRevert(
-            abi.encodeWithSelector(ECDSA.ECDSAInvalidSignature.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(ECDSA.ECDSAInvalidSignature.selector));
         lingoRewardsBaseRaffle.getRaffleTickets(
-            raffleId,
-            player1,
-            100,
-            0,
-            LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v}),
-            keccak256("randomness")
+            raffleId, player1, 100, 0, LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v}), keccak256("randomness")
         );
     }
 
@@ -204,24 +181,13 @@ contract LingoRewardsBaseRaffleTest is Test {
         address account = player1;
         uint256 amount = 100;
         uint256 nonce = 0;
-        LingoRewardsBaseRaffle.Signature
-            memory invalidSignature = LingoRewardsBaseRaffle.Signature({
-                r: bytes32(0),
-                s: bytes32(0),
-                v: 0
-            });
+        LingoRewardsBaseRaffle.Signature memory invalidSignature =
+            LingoRewardsBaseRaffle.Signature({r: bytes32(0), s: bytes32(0), v: 0});
 
         // Attempt to increase player amount with invalid signature
-        vm.expectRevert(
-            abi.encodeWithSelector(ECDSA.ECDSAInvalidSignature.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(ECDSA.ECDSAInvalidSignature.selector));
         lingoRewardsBaseRaffle.getRaffleTickets(
-            raffleId,
-            account,
-            amount,
-            nonce,
-            invalidSignature,
-            keccak256("randomness")
+            raffleId, account, amount, nonce, invalidSignature, keccak256("randomness")
         );
     }
 
@@ -240,9 +206,7 @@ contract LingoRewardsBaseRaffleTest is Test {
 
         // Attempt to get winner for the second time
         vm.prank(owner);
-        vm.expectRevert(
-            LingoRewardsBaseRaffle.CommitmentAlreadyOpened.selector
-        );
+        vm.expectRevert(LingoRewardsBaseRaffle.CommitmentAlreadyOpened.selector);
         lingoRewardsBaseRaffle.getWinner(raffleId, randomness);
     }
 
@@ -258,9 +222,7 @@ contract LingoRewardsBaseRaffleTest is Test {
         bytes memory invalidRandomness = abi.encode("invalid");
 
         vm.prank(owner);
-        vm.expectRevert(
-            LingoRewardsBaseRaffle.InvalidRandomnessOpening.selector
-        );
+        vm.expectRevert(LingoRewardsBaseRaffle.InvalidRandomnessOpening.selector);
         lingoRewardsBaseRaffle.getWinner(raffleId, invalidRandomness);
     }
 
@@ -276,40 +238,16 @@ contract LingoRewardsBaseRaffleTest is Test {
         uint256 amount = 100;
         uint256 nonce = 0;
 
-        bytes32 messageHash = keccak256(
-            abi.encode(raffleId, account, amount, nonce)
-        );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signerPrivateKey,
-            messageHash
-        );
-        LingoRewardsBaseRaffle.Signature
-            memory signature = LingoRewardsBaseRaffle.Signature({
-                r: r,
-                s: s,
-                v: v
-            });
+        bytes32 messageHash = keccak256(abi.encode(raffleId, account, amount, nonce));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
+        LingoRewardsBaseRaffle.Signature memory signature = LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v});
 
         // Increase player amount
-        lingoRewardsBaseRaffle.getRaffleTickets(
-            raffleId,
-            account,
-            amount,
-            nonce,
-            signature,
-            keccak256("randomness")
-        );
+        lingoRewardsBaseRaffle.getRaffleTickets(raffleId, account, amount, nonce, signature, keccak256("randomness"));
 
         // Try to replay the same transaction in the same game
         vm.expectRevert(LingoRewardsBaseRaffle.InvalidNonce.selector);
-        lingoRewardsBaseRaffle.getRaffleTickets(
-            raffleId,
-            account,
-            amount,
-            nonce,
-            signature,
-            keccak256("randomness")
-        );
+        lingoRewardsBaseRaffle.getRaffleTickets(raffleId, account, amount, nonce, signature, keccak256("randomness"));
     }
 
     function testReplayAttackDifferentGames() public {
@@ -325,29 +263,12 @@ contract LingoRewardsBaseRaffleTest is Test {
         uint256 amount = 100;
         uint256 nonce = 0;
 
-        bytes32 messageHash = keccak256(
-            abi.encode(raffleId1, account, amount, nonce)
-        );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signerPrivateKey,
-            messageHash
-        );
-        LingoRewardsBaseRaffle.Signature
-            memory signature = LingoRewardsBaseRaffle.Signature({
-                r: r,
-                s: s,
-                v: v
-            });
+        bytes32 messageHash = keccak256(abi.encode(raffleId1, account, amount, nonce));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
+        LingoRewardsBaseRaffle.Signature memory signature = LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v});
 
         // Increase player amount in first game
-        lingoRewardsBaseRaffle.getRaffleTickets(
-            raffleId1,
-            account,
-            amount,
-            nonce,
-            signature,
-            keccak256("randomness1")
-        );
+        lingoRewardsBaseRaffle.getRaffleTickets(raffleId1, account, amount, nonce, signature, keccak256("randomness1"));
 
         vm.prank(owner);
         lingoRewardsBaseRaffle.getWinner(raffleId1, randomness);
@@ -357,19 +278,8 @@ contract LingoRewardsBaseRaffleTest is Test {
         bytes32 randomnessCommitment2 = keccak256(abi.encode("test2"));
         vm.prank(owner);
         lingoRewardsBaseRaffle.newRaffle(raffleId2, randomnessCommitment2);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                LingoRewardsBaseRaffle.CommitmentAlreadyOpened.selector
-            )
-        );
-        lingoRewardsBaseRaffle.getRaffleTickets(
-            raffleId1,
-            account,
-            amount,
-            nonce,
-            signature,
-            keccak256("randomness1")
-        );
+        vm.expectRevert(abi.encodeWithSelector(LingoRewardsBaseRaffle.CommitmentAlreadyOpened.selector));
+        lingoRewardsBaseRaffle.getRaffleTickets(raffleId1, account, amount, nonce, signature, keccak256("randomness1"));
 
         // Assert that the player amount was increased only in the first game
         assertEq(lingoRewardsBaseRaffle.getPlayerAmount(raffleId2, player1), 0);
@@ -388,26 +298,15 @@ contract LingoRewardsBaseRaffleTest is Test {
         lingoRewardsBaseRaffle.newRaffle(raffleId, randomnessCommitment);
 
         bytes32 messageHash = keccak256(abi.encode(raffleId, player1, 100, 0));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            newSignerPrivateKey,
-            messageHash
-        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(newSignerPrivateKey, messageHash);
 
         // Increase player amount with new signer
         lingoRewardsBaseRaffle.getRaffleTickets(
-            raffleId,
-            player1,
-            100,
-            0,
-            LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v}),
-            keccak256("randomness")
+            raffleId, player1, 100, 0, LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v}), keccak256("randomness")
         );
 
         // Assert that the player amount was increased correctly
-        assertEq(
-            lingoRewardsBaseRaffle.getPlayerAmount(raffleId, player1),
-            100
-        );
+        assertEq(lingoRewardsBaseRaffle.getPlayerAmount(raffleId, player1), 100);
     }
 
     function testPauseAndUnpause() public {
@@ -434,14 +333,8 @@ contract LingoRewardsBaseRaffleTest is Test {
         vm.prank(owner);
         lingoRewardsBaseRaffle.newRaffle(raffleId, randomnessCommitment);
 
-        assertEq(
-            lingoRewardsBaseRaffle.getRaffleRandomnessCommitment(raffleId),
-            randomnessCommitment
-        );
-        assertEq(
-            lingoRewardsBaseRaffle.getRaffleCurrentRandomness(raffleId),
-            randomnessCommitment
-        );
+        assertEq(lingoRewardsBaseRaffle.getRaffleRandomnessCommitment(raffleId), randomnessCommitment);
+        assertEq(lingoRewardsBaseRaffle.getRaffleCurrentRandomness(raffleId), randomnessCommitment);
         assertFalse(lingoRewardsBaseRaffle.getRaffleCommitmentOpened(raffleId));
         assertTrue(lingoRewardsBaseRaffle.getRaffleExists(raffleId));
     }
@@ -477,12 +370,7 @@ contract LingoRewardsBaseRaffleTest is Test {
         vm.prank(owner);
         address winner = lingoRewardsBaseRaffle.getWinner(raffleId, randomness);
 
-        assertTrue(
-            winner == player1 ||
-                winner == player2 ||
-                winner == player3 ||
-                winner == player4
-        );
+        assertTrue(winner == player1 || winner == player2 || winner == player3 || winner == player4);
     }
 
     function testBenchmarkManyUsers() public {
@@ -500,12 +388,8 @@ contract LingoRewardsBaseRaffleTest is Test {
         uint256 totalAmount = 0;
 
         for (uint256 i = 0; i < numUsers; i++) {
-            users[i] = address(
-                uint160(uint256(keccak256(abi.encode(seed, i))))
-            );
-            amounts[i] =
-                (uint256(keccak256(abi.encode(seed, i, "amount"))) % 1000) +
-                1; // Random amount between 1 and 1000
+            users[i] = address(uint160(uint256(keccak256(abi.encode(seed, i)))));
+            amounts[i] = (uint256(keccak256(abi.encode(seed, i, "amount"))) % 1000) + 1; // Random amount between 1 and 1000
             totalAmount += amounts[i];
             addPlayer(raffleId, users[i], amounts[i]);
         }
@@ -525,37 +409,20 @@ contract LingoRewardsBaseRaffleTest is Test {
         assertTrue(isValidWinner, "Winner should be one of the added users");
 
         // Verify total amount
-        assertEq(
-            lingoRewardsBaseRaffle.getTotalSum(raffleId),
-            totalAmount,
-            "Total amount should match"
-        );
+        assertEq(lingoRewardsBaseRaffle.getTotalSum(raffleId), totalAmount, "Total amount should match");
 
         // Verify each user's amount
         for (uint256 i = 0; i < numUsers; i++) {
-            assertEq(
-                lingoRewardsBaseRaffle.getPlayerAmount(raffleId, users[i]),
-                amounts[i],
-                "User amount should match"
-            );
+            assertEq(lingoRewardsBaseRaffle.getPlayerAmount(raffleId, users[i]), amounts[i], "User amount should match");
         }
     }
 
     // Helper function to add a player with a signed message
-    function addPlayer(
-        bytes32 raffleId,
-        address player,
-        uint256 amount
-    ) internal {
+    function addPlayer(bytes32 raffleId, address player, uint256 amount) internal {
         uint256 nonce = playerNonces[player];
 
-        bytes32 messageHash = keccak256(
-            abi.encode(raffleId, player, amount, nonce)
-        );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signerPrivateKey,
-            messageHash
-        );
+        bytes32 messageHash = keccak256(abi.encode(raffleId, player, amount, nonce));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
 
         lingoRewardsBaseRaffle.getRaffleTickets(
             raffleId,
@@ -585,14 +452,8 @@ contract LingoRewardsBaseRaffleTest is Test {
         addPlayer(raffleId, player2, 400);
 
         // Check total amounts
-        assertEq(
-            lingoRewardsBaseRaffle.getPlayerAmount(raffleId, player1),
-            600
-        );
-        assertEq(
-            lingoRewardsBaseRaffle.getPlayerAmount(raffleId, player2),
-            400
-        );
+        assertEq(lingoRewardsBaseRaffle.getPlayerAmount(raffleId, player1), 600);
+        assertEq(lingoRewardsBaseRaffle.getPlayerAmount(raffleId, player2), 400);
 
         // Get winner and check if it's either player1 or player2
         bytes memory randomness = abi.encode("test");
@@ -622,13 +483,8 @@ contract LingoRewardsBaseRaffleTest is Test {
         lingoRewardsBaseRaffle.newRaffle(raffleId, randomnessCommitment);
 
         bytes32 invalidRaffleId = keccak256(abi.encode("invalid"));
-        bytes32 messageHash = keccak256(
-            abi.encode(invalidRaffleId, player1, 100, 0)
-        );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signerPrivateKey,
-            messageHash
-        );
+        bytes32 messageHash = keccak256(abi.encode(invalidRaffleId, player1, 100, 0));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
 
         vm.expectRevert(LingoRewardsBaseRaffle.RaffleDoesNotExist.selector);
         lingoRewardsBaseRaffle.getRaffleTickets(
@@ -654,21 +510,11 @@ contract LingoRewardsBaseRaffleTest is Test {
         lingoRewardsBaseRaffle.getWinner(raffleId, randomness);
 
         bytes32 messageHash = keccak256(abi.encode(raffleId, player2, 200, 0));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-            signerPrivateKey,
-            messageHash
-        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, messageHash);
 
-        vm.expectRevert(
-            LingoRewardsBaseRaffle.CommitmentAlreadyOpened.selector
-        );
+        vm.expectRevert(LingoRewardsBaseRaffle.CommitmentAlreadyOpened.selector);
         lingoRewardsBaseRaffle.getRaffleTickets(
-            raffleId,
-            player2,
-            200,
-            0,
-            LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v}),
-            keccak256("randomness")
+            raffleId, player2, 200, 0, LingoRewardsBaseRaffle.Signature({r: r, s: s, v: v}), keccak256("randomness")
         );
     }
 
