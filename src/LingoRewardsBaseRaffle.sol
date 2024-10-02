@@ -5,6 +5,7 @@ import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {console} from "forge-std/console.sol";
 
 import {IntervalTree} from "./libraries/IntervalTree.sol";
@@ -141,12 +142,12 @@ contract LingoRewardsBaseRaffle is Context, Ownable, Pausable {
         bytes32 randomness
     ) external whenNotPaused {
         if (!raffleExists[raffleId]) revert RaffleDoesNotExist();
-        bytes32 hash = keccak256(abi.encode(raffleId, account, amount, nonce));
+        bytes32 hash = MessageHashUtils.toEthSignedMessageHash(keccak256(abi.encode(raffleId, account, amount, nonce)));
         checkSignature(hash, signature);
         Raffle storage raffle = raffles[raffleId];
         if (raffle.commitmentOpened) revert CommitmentAlreadyOpened();
-        if (nonce != raffle.playerNonces[account]) revert InvalidNonce();
-        raffle.playerNonces[account]++;
+        if (nonce <= raffle.playerNonces[account]) revert InvalidNonce();
+        raffle.playerNonces[account] = nonce;
         raffle.tree.insert(account, amount);
         raffle.currentRandomness = keccak256(abi.encode(raffle.currentRandomness, randomness));
         emit PlayerAmountIncreased(raffleId, account, amount, nonce);
