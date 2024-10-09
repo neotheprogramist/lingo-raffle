@@ -150,8 +150,9 @@ contract LingoRaffle with Deployable, Ownable, Resumable {
         };
         let hash: Int = beginCell().storeRef(data.toCell()).endCell().hash();
         let check: Bool = checkSignature(hash, msg.signature, self.signerPublicKey);
-        dump(check);
-        // require(checkSignature())
+        
+        require(check, "Wrong signature");
+
         let raffle = self.rafflesBuffer.get(msg.raffleId)!!;
         require(!raffle.commitmentOpened, "Raffle commitment already opened");
         

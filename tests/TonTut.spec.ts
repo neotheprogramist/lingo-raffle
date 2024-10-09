@@ -1,10 +1,10 @@
 import { Blockchain,  SandboxContract, TreasuryContract } from '@ton/sandbox';
-import {  Slice, toNano } from '@ton/core';
+import {  Slice, toNano, Cell, beginCell, Address } from '@ton/core';
 import { LingoRaffle } from '../wrappers/TonTut';
 import '@ton/test-utils';
-import { createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync } from 'node:crypto';
 const { keyPairFromSeed, sign } = require('ton-crypto');
-const { beginCell, Address } = require('ton-core');
+
 // import { keyPairFromSeed, sign } from 'ton-crypto';
 // import { beginCell, Address }  from 'ton-core';
 
@@ -37,16 +37,20 @@ function serializeData(
 
     return cell;
 }
-async function generateKeyPair() {
-    const seed = Buffer.from('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'hex');
+// async function generateKeyPair() {
+//     const seed = Buffer.from('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'hex');
 
-    const keyPair = keyPairFromSeed(seed);
+//     const keyPair = keyPairFromSeed(seed);
 
-    return keyPair;
+//     return keyPair;
+// }
+
+function generateKeyPair() {
+    const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+    return { publicKey, privateKey };
 }
-
 async function signRaffleData(raffleData: any) {
-    const keyPair = await generateKeyPair();
+    const keyPair = generateKeyPair();
 
     const raffleId = raffleData.raffleId;
     const account = raffleData.account;
@@ -427,8 +431,10 @@ describe('TonTut', () => {
             }
 
             const data = await signRaffleData(raffleData);
-            const signatureCell: Slice = beginCell().storeBuffer(data.signature).endCell().asSlice();
-            console.log(typeof signatureCell);
+
+            const signatureCell: Cell = beginCell().storeBuffer(data.signature).endCell();
+
+            const signatureSlice: Slice = signatureCell.asSlice();
 
             const getTicketsResult = await tonTut.send(
                 player1.getSender(),
@@ -440,70 +446,85 @@ describe('TonTut', () => {
                     raffleId: BigInt(0),
                     account: player1.address,
                     amount: BigInt(1),
-                    signature: signatureCell,
+                    signature: signatureSlice,
                     nonce: BigInt(0),
                     randomness: BigInt(100)    
                 }
             );
 
-            // expect(getTicketsResult.transactions).toHaveTransaction({
-            //     from: player1.address,
-            //     to: tonTut.address,
-            //     success: true,
-            // });
+            expect(getTicketsResult.transactions).toHaveTransaction({
+                from: player1.address,
+                to: tonTut.address,
+                success: true,
+            });
 
-            // const totalSum = await tonTut.getGetTotalSum(BigInt(0));
-            // expect(totalSum).toBe(BigInt(1));
+            const totalSum = await tonTut.getGetTotalSum(BigInt(0));
+            expect(totalSum).toBe(BigInt(1));
 
-            // const getTicketsResult2 = await tonTut.send(
-            //     player1.getSender(),
-            //     {
-            //         value: toNano('0.15'),
-            //     },
-            //     {
-            //         $$type: "GetRaffleTicketsMessage",
-            //         raffleId: BigInt(0),
-            //         account: player2.address,
-            //         amount: BigInt(14),
-            //         nonce: BigInt(0),
-            //         randomness: BigInt(100)    
-            //     }
-            // );
 
-            // expect(getTicketsResult2.transactions).toHaveTransaction({
-            //     from: player1.address,
-            //     to: tonTut.address,
-            //     success: true,
-            // });
+            const raffleData2 = {
+                raffleId: BigInt(0),
+                account: player1,
+                amount: BigInt(14),
+                nonce: BigInt(0),
+                randomness: BigInt(100)
+            }
 
-            // const totalSum2 = await tonTut.getGetTotalSum(BigInt(0));
-            // expect(totalSum2).toBe(BigInt(15));
-            // const randomnessOpening = randomnessInput;
+            const data2 = await signRaffleData(raffleData2);
 
-            // const winnerResult = await tonTut.getGetWinner(BigInt(0));
-            // expect(winnerResult).toBeNull();
+            const signatureCell2: Cell = beginCell().storeBuffer(data2.signature).endCell();
 
-            // const getWinnerResult = await tonTut.send(
-            //     deployer.getSender(),
-            //     {
-            //         value: toNano('0.15'),
-            //     },
-            //     {
-            //         $$type: "GetWinnerMessage",
-            //         raffleId: BigInt(0),
-            //         randomnessOpening:randomnessOpening   
-            //     }
-            // );
+            const signatureSlice2: Slice = signatureCell2.asSlice();
+            const getTicketsResult2 = await tonTut.send(
+                player1.getSender(),
+                {
+                    value: toNano('0.15'),
+                },
+                {
+                    $$type: "GetRaffleTicketsMessage",
+                    raffleId: BigInt(0),
+                    account: player2.address,
+                    signature: signatureSlice2,
+                    amount: BigInt(14),
+                    nonce: BigInt(0),
+                    randomness: BigInt(100)    
+                }
+            );
 
-            // expect(getWinnerResult.transactions).toHaveTransaction({
-            //     from: deployer.address,
-            //     to: tonTut.address,
-            //     success: true,
-            // });
+            expect(getTicketsResult2.transactions).toHaveTransaction({
+                from: player1.address,
+                to: tonTut.address,
+                success: true,
+            });
 
-            // const winner = await tonTut.getGetWinner(BigInt(0));
+            const totalSum2 = await tonTut.getGetTotalSum(BigInt(0));
+            expect(totalSum2).toBe(BigInt(15));
+            const randomnessOpening = randomnessInput;
 
-            // expect(winner).not.toBeNull();
+            const winnerResult = await tonTut.getGetWinner(BigInt(0));
+            expect(winnerResult).toBeNull();
+
+            const getWinnerResult = await tonTut.send(
+                deployer.getSender(),
+                {
+                    value: toNano('0.15'),
+                },
+                {
+                    $$type: "GetWinnerMessage",
+                    raffleId: BigInt(0),
+                    randomnessOpening:randomnessOpening   
+                }
+            );
+
+            expect(getWinnerResult.transactions).toHaveTransaction({
+                from: deployer.address,
+                to: tonTut.address,
+                success: true,
+            });
+
+            const winner = await tonTut.getGetWinner(BigInt(0));
+
+            expect(winner).not.toBeNull();
         });
         // it('should not get winner with one player', async () => {
         //     const randomnessInput = "test";
@@ -783,22 +804,5 @@ describe('TonTut', () => {
         //     const winner = await tonTut.getGetWinner(BigInt(0));
         //     expect(winner).toBeNull();
         // });
-        // it('should fail creating new game if signarute is not valid', async () => {});
-        // it('fails increasing player amount if signature is not valid', async () => {});
-        // it('should return correct winner', async () => {});
-        // it('should return correct winner with boundary values', async () => {});
-        // it('invalid randomness', async () => {});
-        // it('replay attack same game', async () => {});
-        // it('replay attack different game', async () => {});
-        // it('should correctly pause and unpause', async () => {});
-        // it('should correctly return raffle details', async () => {});
-        // //////
-        // it('bound or default with equal min max', async () => {});
-        // it('get winner with zero total sum', async () => {});
-        // it('raffle tickets commitment already opened', async () => {});
-        // it('get raffle tickets invalid raffleId', async () => {});
-        // it('new raffle when game not concluded', async () => {});
-        // it('multiple participation', async () => {});
-        // it('benchmark many users', async () => {});
     });
 });
