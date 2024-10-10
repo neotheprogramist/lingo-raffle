@@ -3,45 +3,57 @@ import {  Slice, toNano, Cell, beginCell, Address } from '@ton/core';
 import { LingoRaffle } from '../wrappers/TonTut';
 import '@ton/test-utils';
 import { createHash } from 'node:crypto';
-const { keyPairFromSeed, sign } = require('ton-crypto');
+import { keyPairFromSeed, keyPairFromSecretKey, sign, getSecureRandomBytes,signVerify, KeyPair } from '@ton/crypto';
 import nacl from 'tweetnacl';
 
+const data = Buffer.from('Hello wordl!');
 
-const keyPair = nacl.sign.keyPair();
-const publicKey = Buffer.from(keyPair.publicKey);
-const privateKey = Buffer.from(keyPair.secretKey);
+// Create Keypair
+let seed: Buffer;
+let keypair: KeyPair;
+let keypair2: KeyPair;
+let signature: Buffer;
+(async () => {
+    seed = await getSecureRandomBytes(32); // Seed is always 32 bytes
+     keypair = keyPairFromSeed(seed); // Creates keypair from random seed
+    // const keypair2: KeyPair = keyPairFromSecretKey('trololo'); // Creates keypair from secret key
+    
+    // Sign
+  
+})()
 
 
-function serializeData(
-    raffleData:any
-) {
-    const tonAddress = Address.parse(raffleData.account.address.toString());
+// function serializeData(
+//     raffleData:any
+// ) {
+//     const tonAddress = Address.parse(raffleData.account.address.toString());
 
-    const randomnessCell = beginCell()
-    .storeUint(raffleData.randomness, 256) 
-    .endCell();
+//     const randomnessCell = beginCell()
+//     .storeUint(raffleData.randomness, 256) 
+//     .endCell();
 
-    const cell = beginCell()
-        .storeUint(raffleData.raffleId, 256)
-        .storeAddress(tonAddress)
-        .storeUint(raffleData.amount, 256) 
-        .storeUint(raffleData.nonce, 64)
-        .storeRef(randomnessCell)
-        // .storeUint(raffleData.randomness, 256)
-        .endCell();
+//     const cell = beginCell()
+//         .storeUint(raffleData.raffleId, 256)
+//         .storeAddress(tonAddress)
+//         .storeUint(raffleData.amount, 256) 
+//         .storeUint(raffleData.nonce, 64)
+//         .storeRef(randomnessCell)
+//         // .storeUint(raffleData.randomness, 256)
+//         .endCell();
         
-    // console.log('cell: ',cell);
-    return cell;
-}
+//     // console.log('cell: ',cell);
+//     return cell;
+// }
 
-function signRaffleData(raffleData: any, privateKey: Buffer) {
-    const cell = serializeData(raffleData);
-    const dataHash = cell.hash(); 
-    // console.log('hashData: ',BigInt('0x'+dataHash.toString('hex')));
-    const signature = nacl.sign.detached(dataHash, privateKey); 
+// function signRaffleData(raffleData: any, privateKey: Buffer) {
+//     const cell = serializeData(raffleData);
+//     const dataHash = cell.hash(); 
+//     // console.log('hashData: ',BigInt('0x'+dataHash.toString('hex')));
+//     const signature = nacl.sign.detached(dataHash, privateKey); 
 
-    return Buffer.from(signature);
-}
+//     return Buffer.from(signature);
+// }
+
 
 describe('TonTut', () => {
     let blockchain: Blockchain;
@@ -58,8 +70,10 @@ describe('TonTut', () => {
         player1 = await blockchain.treasury('player1');
         player2 = await blockchain.treasury('player2');
         signer = await blockchain.treasury('signer');
-      
-        tonTut = blockchain.openContract(await LingoRaffle.fromInit(1n, deployer.address, BigInt('0x'+Buffer.from(publicKey).toString('hex'))));
+        //sig      
+        tonTut = blockchain.openContract(await LingoRaffle.fromInit(1n, deployer.address, BigInt('0x'+keypair.publicKey.toString('hex'))));
+          //endsig
+        // tonTut = blockchain.openContract(await LingoRaffle.fromInit(1n, deployer.address, BigInt('0x'+Buffer.from(publicKey).toString('hex'))));
 
         const deployResult = await tonTut.send(
             deployer.getSender(),
@@ -84,21 +98,17 @@ describe('TonTut', () => {
             
             expect(signerBefore.toString()).toBe(deployer.address.toString());
 
-            const cell = beginCell()
-            .storeUint(BigInt(200), 256)
-            .endCell();
-
-            const message = JSON.stringify(cell);
-            const messageBytes = new TextEncoder().encode(message);
-            const dataHash = cell.hash(); 
-            console.log('hashData: ',BigInt('0x'+dataHash.toString('hex')));
-            const signature = nacl.sign.detached(dataHash, privateKey); 
-
-            const signatureBuffer = Buffer.from(signature);
-            const signatureCell: Cell = beginCell().storeBuffer(signatureBuffer).endCell();
+           
+            const dataCell = beginCell().storeBuffer(data).endCell();
+            const dataForSig = dataCell.toBoc();
+            signature = sign(dataForSig, keypair.secretKey);
+            console.log(signature);
+            const signatureCell: Cell = beginCell().storeBuffer(signature).endCell();
 
             const signatureSlice: Slice = signatureCell.asSlice();
-            // console.log('signatureSlice: ',signatureSlice);
+
+            const valid: boolean = signVerify(dataForSig, signature, keypair.publicKey);
+            console.log('valid: ',valid);
 
             const changeOwnerResult = await tonTut.send(
                 deployer.getSender(),
@@ -108,7 +118,7 @@ describe('TonTut', () => {
                 {
                     $$type: "SigCheck",
                     signature: signatureSlice,
-                    data: cell
+                    data: dataCell
                 }
             );
     
@@ -121,7 +131,7 @@ describe('TonTut', () => {
     describe('Basic functionality', ()=>{
         it('should deploy', async () => {
             // the check is done inside beforeEach
-            // blockchain and tonTut are ready to use
+            // blockchain and LingoRaffle are ready to use
         });
         it('should change signer', async () => {
             const newSigner = await blockchain.treasury('newSigner');
