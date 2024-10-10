@@ -18,14 +18,15 @@ message GetRaffleTicketsMessage {
     account: Address;
     amount: Int as uint256;
     nonce: Int as uint256;
-    signature: Slice;
     randomness: Int as uint256;
+    // data: Cell;
+    // signature: Slice;
 }
 struct RaffleTicketsData {
     raffleId: Int as uint256;
     account: Address;
     amount: Int as uint256;
-    nonce: Int as uint256;
+    nonce: Int as uint64;
     randomness: Int as uint256;
 }
 message PlayerAmountIncreasedEvent {
@@ -69,15 +70,11 @@ struct Tree {
     totalSum: Int as uint256;
     nodes: map<Address, Node>;
 }
-// struct Signature {
-//     v: Int as uint8;
-//     r: Slice as bytes32;
-//     s: Slice as bytes32;
-// }
-// struct SignatureParts {
-//     signature: Signature;
-//     hash: Int;
-// }
+
+message SigCheck {
+    signature: Slice;
+    data: Cell;
+}
 
 // TODO: implement replys
 contract LingoRaffle with Deployable, Ownable, Resumable {
@@ -138,21 +135,31 @@ contract LingoRaffle with Deployable, Ownable, Resumable {
         emit(RaffleCreatedEvent{raffleId: self.currentIndex, randomnessCommitment: msg.randomnessCommitment}.toCell());
     }
 
+    receive(msg: SigCheck){
+        let hash: Int = beginCell().storeRef(msg.data).endCell().hash();
+        dump(hash);
+
+        let check: Bool = checkSignature(hash, msg.signature, self.signerPublicKey);
+        dump(check);
+    }
+
     receive(msg: GetRaffleTicketsMessage){
         self.requireNotStopped(); // cant work if a contract is stopped
         require(msg.raffleId >= 0 && msg.raffleId <= self.maxIndex, "Raffle with this key does not exist");
-        let data: RaffleTicketsData = RaffleTicketsData{
-            raffleId: msg.raffleId,
-            account: msg.account,
-            amount: msg.amount,
-            nonce: msg.nonce,
-            randomness: msg.randomness
-        };
-        let hash: Int = beginCell().storeRef(data.toCell()).endCell().hash();
-        let check: Bool = checkSignature(hash, msg.signature, self.signerPublicKey);
-        
-        require(check, "Wrong signature");
-
+        // let data: RaffleTicketsData = RaffleTicketsData{
+        //     raffleId: msg.raffleId,
+        //     account: msg.account,
+        //     amount: msg.amount,
+        //     nonce: msg.nonce,
+        //     randomness: msg.randomness
+        // };
+        // let hash: Int = beginCell().storeRef(data.asCell()).endCell().hash();
+        // dump(data);
+        // dump(hash);
+        // dump(msg.signature);
+        // let check: Bool = checkSignature(hash, msg.signature, self.signerPublicKey);
+        // require(check, "Wrong signature");
+        // dump(check);
         let raffle = self.rafflesBuffer.get(msg.raffleId)!!;
         require(!raffle.commitmentOpened, "Raffle commitment already opened");
         
@@ -168,6 +175,7 @@ contract LingoRaffle with Deployable, Ownable, Resumable {
             commitmentOpened: raffle.commitmentOpened,
             playerNonces: raffle.playerNonces
         };
+
         updatedRaffle.playerNonces.set(msg.account, accountNonce);
         
         self.insert(msg.raffleId, msg.account, msg.amount);
