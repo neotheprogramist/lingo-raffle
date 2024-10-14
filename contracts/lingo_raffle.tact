@@ -133,7 +133,7 @@ contract LingoRaffle with Deployable, Ownable, Resumable {
 
     receive(msg: SetWinnerMessage){
         self.requireNotStopped();
-        self.requireOwner();
+        require(self.signer == sender(), "wrong signer");
 
         let raffle = self.rafflesBuffer.get(msg.raffleId)!!;
 
