@@ -15,32 +15,26 @@ message RaffleCreatedEvent {
 }
 message GetRaffleTicketsMessage {
     raffleId: Int as uint256;
-    account: Address;
-    amount: Int as uint256;
-    nonce: Int as uint256;
     randomness: Int as uint256;
-    // data: Cell;
-    // signature: Slice;
+    account: Address;
+    amount: Int;
 }
 struct RaffleTicketsData {
     raffleId: Int as uint256;
-    account: Address;
-    amount: Int as uint256;
-    nonce: Int as uint64;
     randomness: Int as uint256;
 }
-message PlayerAmountIncreasedEvent {
-    raffleId: Int as uint256;
-    player: Address;
-    amount: Int as uint256;
-    nonce: Int as uint256;
-}
-message GetWinnerMessage {
+message SetWinnerMessage {
     raffleId: Int as uint256;
     randomnessOpening: String;
+    winner: Address;
 }
 message ChangeSignerMessage {
    newSigner: Address;
+}
+message PlayerAmountIncreasedEvent{
+    raffleId: Int as uint256;
+    player: Address;
+    amount: Int;
 }
 message WinnerDeclaredEvent {
     raffleId: Int as uint256;
@@ -55,26 +49,9 @@ struct Raffle {
     randomnessCommitment: Int as uint256;
     currentRandomness: Int as uint256;
     commitmentOpened: Bool;
-    playerNonces: map<Address, Int as uint256>;
     winner: Address?;
 }
-struct Node {
-    value: Int as uint256;
-    left: Address?;
-    leftSum: Int as uint256;
-    right: Address?;
-    rightSum: Int as uint256;
-}
-struct Tree {
-    root: Address;
-    totalSum: Int as uint256;
-    nodes: map<Address, Node>;
-}
 
-message SigCheck {
-    signature: Slice;
-    data: Cell;
-}
 
 // TODO: implement replys
 contract LingoRaffle with Deployable, Ownable, Resumable {
@@ -82,7 +59,6 @@ contract LingoRaffle with Deployable, Ownable, Resumable {
     signer: Address;
     stopped: Bool;
     rafflesBuffer: map<Int as uint256, Raffle>;
-    treesBuffer: map<Int as uint256, Tree>;
     currentIndex: Int as int8;
     maxIndex: Int as int8;
     signerPublicKey: Int;
@@ -120,95 +96,60 @@ contract LingoRaffle with Deployable, Ownable, Resumable {
 
     receive(msg: CreateNewRaffleMessage){
         self.requireNotStopped(); // cant work if a contract is stopped
+        require(self.signer == sender(), "wrong signer");
         self.rafflesBuffer.set(self.currentIndex,
             Raffle{
                 randomnessCommitment: msg.randomnessCommitment,
                 currentRandomness: msg.randomnessCommitment,
                 commitmentOpened: false,
-                playerNonces: emptyMap()
+                winner: null
             }
-        );
-        self.treesBuffer.set(self.currentIndex,
-            Tree{root: newAddress(0, 0x7fFFfFfFFFfFFFFfFffFfFfFfffFFfFfFffFFFFf), totalSum: 0, nodes: emptyMap()}
         );
         self.increaseIndex();
         emit(RaffleCreatedEvent{raffleId: self.currentIndex, randomnessCommitment: msg.randomnessCommitment}.toCell());
     }
 
-    receive(msg: SigCheck){
-        let hash: Int = beginCell().storeRef(msg.data).endCell().hash();
-        dump(hash);
-
-        let check: Bool = checkSignature(hash, msg.signature, self.signerPublicKey);
-        dump(check);
-    }
-
     receive(msg: GetRaffleTicketsMessage){
         self.requireNotStopped(); // cant work if a contract is stopped
+        require(self.signer == sender(), "wrong signer");
         require(msg.raffleId >= 0 && msg.raffleId <= self.maxIndex, "Raffle with this key does not exist");
-        // let data: RaffleTicketsData = RaffleTicketsData{
-        //     raffleId: msg.raffleId,
-        //     account: msg.account,
-        //     amount: msg.amount,
-        //     nonce: msg.nonce,
-        //     randomness: msg.randomness
-        // };
-        // let hash: Int = beginCell().storeRef(data.asCell()).endCell().hash();
-        // dump(data);
-        // dump(hash);
-        // dump(msg.signature);
-        // let check: Bool = checkSignature(hash, msg.signature, self.signerPublicKey);
-        // require(check, "Wrong signature");
-        // dump(check);
+
         let raffle = self.rafflesBuffer.get(msg.raffleId)!!;
         require(!raffle.commitmentOpened, "Raffle commitment already opened");
-        
-        let accountNonce: Int? = raffle.playerNonces.get(msg.account);
-        if (accountNonce == null) {
-            accountNonce = 0;
-        }
-        accountNonce = accountNonce!! + 1;
-        
+
         let updatedRaffle = Raffle{
             randomnessCommitment: raffle.randomnessCommitment,
             currentRandomness: raffle.currentRandomness,
             commitmentOpened: raffle.commitmentOpened,
-            playerNonces: raffle.playerNonces
         };
 
-        updatedRaffle.playerNonces.set(msg.account, accountNonce);
-        
-        self.insert(msg.raffleId, msg.account, msg.amount);
-       
         let serializeData = beginString().concat(updatedRaffle.currentRandomness.toString()).concat(msg.randomness.toString());
         updatedRaffle.currentRandomness = sha256(serializeData.toString());
-        
+
         self.rafflesBuffer.set(msg.raffleId, updatedRaffle);
-        
-        emit(PlayerAmountIncreasedEvent{raffleId: msg.raffleId, player: msg.account, amount: msg.amount, nonce: accountNonce!!}.toCell());
+
+        emit(PlayerAmountIncreasedEvent{raffleId: msg.raffleId, player: msg.account, amount: msg.amount}.toCell());
     }
 
-    receive(msg: GetWinnerMessage){
+    receive(msg: SetWinnerMessage){
         self.requireNotStopped();
         self.requireOwner();
-     
+
         let raffle = self.rafflesBuffer.get(msg.raffleId)!!;
-    
+
         require(sha256(msg.randomnessOpening) == raffle.randomnessCommitment, "Invalid randomness openin");
-       
+
         require(!raffle.commitmentOpened,"Raffle commitment already opened");
-      
         raffle.commitmentOpened = true;
         self.rafflesBuffer.set(msg.raffleId, raffle);
         let serializeData = beginString().concat(raffle.currentRandomness.toString()).concat(msg.randomnessOpening);
         let currentRandomness = sha256(serializeData.toString());
-        let max: Int = self.getTotalSum(msg.raffleId);
-        let boundedRandomness: Int = self.boundOrDefault(currentRandomness, 0, max);
-        let winner: Address? = self.getByPointOnInterval(msg.raffleId, boundedRandomness);
-        raffle.winner = winner;
-   
+
+        raffle.winner = msg.winner;
+
         self.rafflesBuffer.set(msg.raffleId, raffle);
-        emit(WinnerDeclaredEvent{raffleId: msg.raffleId, winner: winner}.toCell());  
+        emit(WinnerDeclaredEvent{raffleId: msg.raffleId, winner: msg.winner}.toCell());
+
     }
     get fun getRaffle(key: Int): Raffle? {
         require(key >= 0 && key <= self.maxIndex, "Raffle with this key does not exist");
@@ -216,37 +157,35 @@ contract LingoRaffle with Deployable, Ownable, Resumable {
         return raffle;
     }
 
-    get fun getRaffleRandomnessCommitment(key: Int): Int {
+    get fun getRaffleRandomnessCommitment(key: Int): Int? {
         require(key >= 0 && key <= self.maxIndex, "Raffle with this key does not exist");
         let raffle = self.rafflesBuffer.get(key);
+        if(raffle != null){
         return raffle!!.randomnessCommitment;
+        } else {
+            return null;
+        }
     }
 
-    get fun getRaffleCurrentRandomness(key: Int): Int {
+    get fun getRaffleCurrentRandomness(key: Int): Int? {
         require(key >= 0 && key <= self.maxIndex, "Raffle with this key does not exist");
         let raffle = self.rafflesBuffer.get(key);
-        return raffle!!.currentRandomness;
+        if(raffle != null){
+            return raffle!!.currentRandomness;
+        } else {
+            return null;
+        }
     }
 
-    get fun getRaffleCommitmentOpened(key: Int): Bool {
+    get fun getRaffleCommitmentOpened(key: Int): Bool? {
         require(key >= 0 && key <= self.maxIndex, "Raffle with this key does not exist");
-        let raffle = self.rafflesBuffer.get(key)!!;
-        return raffle.commitmentOpened;
-    }
-
-    get fun getTotalSum(key: Int): Int {
-        require(key >= 0 && key <= self.maxIndex, "Raffle with this key does not exist");
-        let tree = self.treesBuffer.get(key);
-        return tree!!.totalSum;
-    }
-
-    get fun getPlayerAmount(key: Int, account: Address): Int {
-        require(key >= 0 && key <= self.maxIndex, "Raffle with this key does not exist");
-        
         let raffle = self.rafflesBuffer.get(key);
-        return raffle!!.playerNonces.get(account)!!;
+        if(raffle != null){
+        return raffle!!.commitmentOpened;
+        }else {
+            return null;
+        }
     }
-
     fun boundOrDefault(value: Int, min: Int, max: Int): Int {
             let uint256Max: Int = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
             if(max > min){
@@ -263,142 +202,10 @@ contract LingoRaffle with Deployable, Ownable, Resumable {
     get fun getWinner(key: Int): Address? {
         require(key >= 0 && key <= self.maxIndex, "Raffle with this key does not exist");
         let raffle = self.rafflesBuffer.get(key);
+        if(raffle != null){
         return raffle!!.winner;
-    }
-    // trees functions
-    fun insert(key: Int,account: Address, amount: Int) {
-        require(key >= 0 && key <= self.maxIndex, "Raffle with this key does not exist");
-        let currentTree = self.treesBuffer.get(key)!!;
-        let parent: Address = newAddress(0,0);
-        let current: Address? = currentTree.root;
-        let shouldIterate: Bool = true;
-        while(current != null && shouldIterate) {
-            parent = current!!;
-            
-            if(parent == account) {
-                shouldIterate = false;
-            } else if (parent.asSlice().hash() < account.asSlice().hash()) {
-                let node: Node? = currentTree.nodes.get(parent);
-                let newNode: Node = Node{
-                                    value: 0,
-                                    left: null,
-                                    leftSum: 0,
-                                    right: null,
-                                    rightSum: 0
-                                };
-                if(node == null){
-                   newNode.leftSum += amount;
-                }else{
-                    newNode.leftSum = node!!.leftSum +amount;
-                }
-
-                currentTree.nodes.set(parent, node);
-                current = newNode.left;
-                if(current == null){
-                    newNode.left = account;
-                    currentTree.nodes.set(parent, newNode);
-                    current = account;
-                }
-            } else {
-                let node: Node? = currentTree.nodes.get(parent);
-                let newNode: Node = Node{
-                    value: 0,
-                    left: null,
-                    leftSum: 0,
-                    right: null,
-                    rightSum: 0
-                };
-                if(node == null){
-                   newNode.rightSum += amount;
-                }else{
-                    newNode.rightSum = node!!.rightSum +amount;
-                }
-
-                currentTree.nodes.set(parent, node);
-           
-                current = newNode.right;
-                if(current == null){
-                    newNode.right = account;
-                    
-                    currentTree.nodes.set(parent, newNode);
-                    current = account;
-                }
-            }
-
-        }
-
-        if (current == null) {
-            currentTree.nodes.set(account, Node{
-                value: amount,
-                left: null,
-                leftSum: 0,
-                right: null,
-                rightSum: 0
-            });
         } else {
-            let node: Node? = currentTree.nodes.get(current!!);
-            let newNode: Node = Node{
-                value: 0,
-                left: null,
-                leftSum: 0,
-                right: null,
-                rightSum: 0
-            };
-            if(node == null){
-                newNode.value = amount;
-            } else {
-                newNode.value += amount;
-            }
-            currentTree.nodes.set(current!!, newNode);
-        }
-        let tree: Tree = currentTree;
-        tree.totalSum += amount;
-
-        self.treesBuffer.set(key, tree);
-    }
-
-    get fun getTreeAccountValue(key: Int,account: Address): Int {
-         require(key >= 0 && key <= self.maxIndex, "Raffle with this key does not exist");
-        let currentTree = self.treesBuffer.get(key);
-        let current: Address = currentTree!!.root;
-
-        let uintCurrent = current.toString().asSlice().loadUint(256);
-        let uintAccount = account.toString().asSlice().loadUint(256);
-        while (current != newAddress(0,0)) {
-            if (current == account) {
-                let node: Node = currentTree!!.nodes.get(current)!!;
-                return node.value;
-            } else if (uintCurrent > uintAccount) {
-                current = currentTree!!.nodes.get(current)!!.left!!;
-            } else {
-                current = currentTree!!.nodes.get(current)!!.right!!;
-            }
-        }
-
-        return 0; 
-    }
-
-    get fun getByPointOnInterval(key: Int, value: Int): Address? {
-        require(key >= 0 && key <= self.maxIndex, "Raffle with this key does not exist");
-        let currentTree = self.treesBuffer.get(key)!!;
-        let current: Address? = currentTree.root;
-        if(currentTree.totalSum == 0){
             return null;
         }
-
-        while (current != null) {
-            let node: Node? = currentTree.nodes.get(current!!);
-            if(value < node!!.leftSum){
-                current = node!!.left;
-            } else if(value < node!!.leftSum + node!!.value){
-                return current;
-            } else {
-                value -= node!!.leftSum + node!!.value;
-                current = node!!.right;
-            }
-        }
-
-        return null; 
     }
-
 }
